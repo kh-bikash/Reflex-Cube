@@ -10,11 +10,26 @@ from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from .config import DATABASE_URL
 
+_is_sqlite = DATABASE_URL.startswith("sqlite")
+
 # `check_same_thread` only applies to SQLite, where the single connection is
 # shared across the threadpool FastAPI runs sync endpoints on.
-_connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+_connect_args: dict = {"check_same_thread": False} if _is_sqlite else {}
 
-engine = create_engine(DATABASE_URL, connect_args=_connect_args, future=True)
+_engine_args: dict = {}
+if not _is_sqlite:
+    # Serverless Postgres (Neon, Supabase) drops idle connections, and a free
+    # tier caps how many may be open at once. Pre-ping replaces a connection
+    # the server already closed instead of failing the request; recycling and
+    # a small pool keep us inside the cap.
+    _engine_args = {
+        "pool_pre_ping": True,
+        "pool_recycle": 280,
+        "pool_size": 5,
+        "max_overflow": 5,
+    }
+
+engine = create_engine(DATABASE_URL, connect_args=_connect_args, future=True, **_engine_args)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, future=True)
 Base = declarative_base()
 
@@ -36,7 +51,7 @@ def _add_missing_columns() -> None:
     the schema has needed so far. A destructive change still needs
     `python -m scripts.reset_db`.
     """
-    if not DATABASE_URL.startswith("sqlite"):
+    if not _is_sqlite:
         return
 
     from sqlalchemy import inspect, text

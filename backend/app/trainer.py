@@ -283,15 +283,38 @@ def run_training_job(job_data: dict[str, Any], job_id: str) -> None:
             log_event=log_event,
         )
 
+        # Publish before marking complete, so a job reported as finished has
+        # its model somewhere that outlives this container.
+        hub_repo_id = _publish(
+            job_id=job_id,
+            job_dir=job_dir,
+            job_name=job_data.get("name") or "model",
+            prompt=prompt,
+            task=task,
+            base_model=model_name,
+            dataset=dataset_name,
+            metrics=metrics,
+            log_event=log_event,
+        )
+
         update_job(
             job_id,
             status=JobStatusValue.COMPLETED,
             progress=100,
             result_path=str(job_dir),
+            hub_repo_id=hub_repo_id,
             accuracy=metrics.get("eval_accuracy"),
             loss=metrics.get("eval_loss") or metrics.get("train_loss"),
         )
-        log_event({"stage": "completed", "job_id": job_id, "task": task, **metrics})
+        log_event(
+            {
+                "stage": "completed",
+                "job_id": job_id,
+                "task": task,
+                "hub_repo_id": hub_repo_id,
+                **metrics,
+            }
+        )
         logger.info("Job %s completed (%s).", job_id, task)
 
     except Exception as exc:
@@ -301,6 +324,56 @@ def run_training_job(job_data: dict[str, Any], job_id: str) -> None:
         log_event({"stage": "failed", "error": str(exc)})
         with contextlib.suppress(OSError):
             (job_dir / "error.txt").write_text(tb, encoding="utf-8")
+
+
+def _publish(
+    *, job_id, job_dir, job_name, prompt, task, base_model, dataset, metrics, log_event
+) -> str | None:
+    """Push the finished model to the Hub, if publishing is configured.
+
+    Best-effort: a push failure is recorded on the job but does not fail it.
+    The model is still on disk for as long as this instance lives.
+    """
+    from . import publisher
+
+    token = _owner_hub_token(job_id)
+    if not publisher.is_enabled(token):
+        return None
+
+    update_job(job_id, progress=99)
+    log_event({"stage": "publishing"})
+    try:
+        repo_id = publisher.publish(
+            model_dir=job_dir,
+            job_id=job_id,
+            job_name=job_name,
+            prompt=prompt,
+            task=task,
+            base_model=base_model,
+            dataset=dataset,
+            metrics=metrics,
+            user_token=token,
+        )
+    except publisher.PublishError as exc:
+        logger.warning("Job %s: could not publish: %s", job_id, exc)
+        update_job(job_id, error_msg=f"Model trained, but publishing failed: {exc}")
+        log_event({"stage": "publish_failed", "error": str(exc)})
+        return None
+
+    log_event({"stage": "published", "repo_id": repo_id, "url": publisher.hub_url(repo_id)})
+    return repo_id
+
+
+def _owner_hub_token(job_id: str) -> str | None:
+    """The job owner's own Hub token, so the model lands in their account."""
+    from .models import User
+
+    with session_scope() as session:
+        job = session.get(TrainingJob, job_id)
+        if job is None or not job.user_id:
+            return None
+        user = session.get(User, job.user_id)
+        return user.hf_token if user else None
 
 
 def _split(raw):

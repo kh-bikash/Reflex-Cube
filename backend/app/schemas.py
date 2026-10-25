@@ -21,6 +21,49 @@ TaskName = Literal[
 ]
 
 
+# ---------------------------------------------------------------------------
+# Auth
+# ---------------------------------------------------------------------------
+
+
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=256)
+    display_name: str | None = Field(default=None, max_length=80)
+
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str = Field(min_length=1, max_length=256)
+
+
+class UpdateProfileRequest(BaseModel):
+    display_name: str | None = Field(default=None, max_length=80)
+    #: A Hugging Face write token, so trained models can be pushed to the
+    #: user's own Hub account. Write-only: never returned by the API.
+    hf_token: str | None = Field(default=None, max_length=256)
+    current_password: str | None = Field(default=None, max_length=256)
+    new_password: str | None = Field(default=None, max_length=256)
+
+
+class UserProfile(BaseModel):
+    id: str
+    email: str
+    display_name: str = ""
+    created_at: datetime | None = None
+    #: Whether a Hub token is stored. The token itself is never exposed.
+    has_hf_token: bool = False
+
+    model_config = {"from_attributes": True}
+
+
+class AuthResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserProfile
+
+
 class CreateModelRequest(BaseModel):
     name: str = Field(min_length=1, max_length=120)
     prompt: str = Field(min_length=1, max_length=4000)
@@ -35,6 +78,9 @@ class CreateModelResponse(BaseModel):
 class JobStatus(BaseModel):
     id: str
     name: str = ""
+    #: The prompt the job was created from. The dashboard shows it, so a user
+    #: can tell two runs apart without opening each one.
+    prompt: str = ""
     task: str = "text-generation"
     status: str
     progress: int = 0
@@ -44,6 +90,7 @@ class JobStatus(BaseModel):
     model_name: str | None = None
     dataset_name: str | None = None
     result_path: str | None = None
+    hub_repo_id: str | None = None
     error: str | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -106,3 +153,9 @@ class HealthResponse(BaseModel):
     database: str
     cubes: int
     storage_path: str
+    #: What a client needs to know before showing a sign-in screen or a
+    #: "training unavailable" notice.
+    auth_required: bool = True
+    registration_open: bool = True
+    training_available: bool = False
+    model_publishing: bool = False

@@ -16,10 +16,16 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 
-from ..config import BASE_DIR, STORAGE_PATH
+from ..config import (
+    BASE_DIR,
+    MAX_CONCURRENT_JOBS_PER_USER,
+    MAX_CONCURRENT_JOBS_TOTAL,
+    STORAGE_PATH,
+)
 from ..db import get_db
+from ..deps import RequiredUser
 from ..logging_config import get_logger
-from ..models import JobStatusValue, TrainingJob
+from ..models import JobStatusValue, TrainingJob, User
 from ..schemas import (
     CreateModelRequest,
     CreateModelResponse,
@@ -38,18 +44,60 @@ router = APIRouter(prefix="/api", tags=["Models"])
 WORKER_SCRIPT = BASE_DIR / "train_worker.py"
 
 
-def _get_job(db: Session, job_id: str) -> TrainingJob:
+def _get_job(db: Session, job_id: str, user: User | None) -> TrainingJob:
+    """Fetch a job the caller is allowed to see.
+
+    A job owned by someone else is reported as 404 rather than 403: whether an
+    id exists is not something one user should learn about another's work.
+    """
     if not is_valid_job_id(job_id):
         raise HTTPException(status_code=400, detail="Malformed job id")
+
     job = db.get(TrainingJob, job_id)
     if job is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if user is not None and job.user_id not in (None, user.id):
         raise HTTPException(status_code=404, detail="Job not found")
     return job
 
 
+def _check_capacity(db: Session, user: User | None) -> None:
+    """Refuse a new job when the instance (or the user) is already busy.
+
+    Training is CPU-bound and a free container has two cores; without this one
+    person can queue enough work to make the service unusable for everyone.
+    """
+    active = db.query(TrainingJob).filter(TrainingJob.status.in_(JobStatusValue.ACTIVE))
+
+    if MAX_CONCURRENT_JOBS_TOTAL > 0 and active.count() >= MAX_CONCURRENT_JOBS_TOTAL:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                "The server is already training as many models as it can handle. "
+                "Try again in a few minutes."
+            ),
+        )
+
+    if user is not None and MAX_CONCURRENT_JOBS_PER_USER > 0:
+        mine = active.filter(TrainingJob.user_id == user.id).count()
+        if mine >= MAX_CONCURRENT_JOBS_PER_USER:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"You already have {mine} job(s) training. Wait for them to "
+                    "finish before starting another."
+                ),
+            )
+
+
 @router.post("/models/create", response_model=CreateModelResponse, status_code=202)
-def create_model(req: CreateModelRequest, db: Session = Depends(get_db)) -> CreateModelResponse:
+def create_model(
+    req: CreateModelRequest, user: RequiredUser, db: Session = Depends(get_db)
+) -> CreateModelResponse:
     """Queue a prompt for background model generation."""
+    _check_capacity(db, user)
+
     job_id = str(uuid.uuid4())
     job = TrainingJob(
         id=job_id,
@@ -57,6 +105,7 @@ def create_model(req: CreateModelRequest, db: Session = Depends(get_db)) -> Crea
         prompt=req.prompt,
         task=req.task or "auto",
         status=JobStatusValue.QUEUED,
+        user_id=user.id if user else None,
     )
     db.add(job)
     db.commit()
@@ -117,24 +166,27 @@ def _spawn_worker(job_id: str, req: CreateModelRequest) -> None:
 
 
 @router.get("/training/status/{job_id}", response_model=JobStatus)
-def training_status(job_id: str, db: Session = Depends(get_db)) -> JobStatus:
+def training_status(job_id: str, user: RequiredUser, db: Session = Depends(get_db)) -> JobStatus:
     """Current progress, metrics and status of a training job."""
-    return JobStatus.model_validate(_get_job(db, job_id))
+    return JobStatus.model_validate(_get_job(db, job_id, user))
 
 
 @router.get("/models/all", response_model=list[JobStatus])
-def get_all_models(db: Session = Depends(get_db)) -> list[JobStatus]:
-    """Every job, newest first."""
-    jobs = db.query(TrainingJob).order_by(TrainingJob.created_at.desc()).all()
+def get_all_models(user: RequiredUser, db: Session = Depends(get_db)) -> list[JobStatus]:
+    """The caller's jobs, newest first."""
+    query = db.query(TrainingJob)
+    if user is not None:
+        query = query.filter(TrainingJob.user_id == user.id)
+    jobs = query.order_by(TrainingJob.created_at.desc()).all()
     return [JobStatus.model_validate(job) for job in jobs]
 
 
 @router.post("/models/{job_id}/predict", response_model=PredictResponse)
 async def predict(
-    job_id: str, req: PredictRequest, db: Session = Depends(get_db)
+    job_id: str, req: PredictRequest, user: RequiredUser, db: Session = Depends(get_db)
 ) -> PredictResponse:
     """Run inference with a completed model."""
-    job = _get_job(db, job_id)
+    job = _get_job(db, job_id, user)
     if not job.result_path or not os.path.exists(job.result_path):
         raise HTTPException(status_code=409, detail="Model is not ready yet")
 
@@ -165,9 +217,9 @@ def _run_pipeline(model_path: str, task: str, text: str):
 
 
 @router.delete("/models/{job_id}", response_model=DeleteResponse)
-def delete_model(job_id: str, db: Session = Depends(get_db)) -> DeleteResponse:
+def delete_model(job_id: str, user: RequiredUser, db: Session = Depends(get_db)) -> DeleteResponse:
     """Delete a job and its artefacts."""
-    job = _get_job(db, job_id)
+    job = _get_job(db, job_id, user)
 
     artefact_dir = Path(job.result_path) if job.result_path else job_dir(job_id, create=False)
     if artefact_dir.exists():
@@ -204,9 +256,9 @@ def _build_archive(job: TrainingJob) -> Path:
 
 
 @router.get("/models/download/{job_id}")
-async def download(job_id: str, db: Session = Depends(get_db)) -> FileResponse:
+async def download(job_id: str, user: RequiredUser, db: Session = Depends(get_db)) -> FileResponse:
     """Download the trained model as a zip archive."""
-    job = _get_job(db, job_id)
+    job = _get_job(db, job_id, user)
     if not job.result_path or not Path(job.result_path).exists():
         raise HTTPException(status_code=409, detail="Model is not ready yet")
 
@@ -215,15 +267,19 @@ async def download(job_id: str, db: Session = Depends(get_db)) -> FileResponse:
 
 
 @router.get("/models/download-zip-stream/{job_id}", include_in_schema=False)
-async def download_zip_stream(job_id: str, db: Session = Depends(get_db)) -> FileResponse:
+async def download_zip_stream(
+    job_id: str, user: RequiredUser, db: Session = Depends(get_db)
+) -> FileResponse:
     """Alias kept for the existing frontend download link."""
-    return await download(job_id, db)
+    return await download(job_id, user, db)
 
 
 @router.post("/models/download-zip/{job_id}", response_model=DownloadUrlResponse)
-def prepare_download_zip(job_id: str, db: Session = Depends(get_db)) -> DownloadUrlResponse:
+def prepare_download_zip(
+    job_id: str, user: RequiredUser, db: Session = Depends(get_db)
+) -> DownloadUrlResponse:
     """Return the URL to download a completed model from."""
-    job = _get_job(db, job_id)
+    job = _get_job(db, job_id, user)
     if job.status != JobStatusValue.COMPLETED:
         raise HTTPException(status_code=409, detail=f"Job is '{job.status}', not completed")
     return DownloadUrlResponse(url=f"/api/models/download/{job_id}")

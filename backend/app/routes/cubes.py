@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 from starlette.concurrency import run_in_threadpool
 
 from ..cubes.registry import registry
+from ..deps import RequiredUser
 from ..logging_config import get_logger
 from ..schemas import CubeInfo, CubeListResponse, CubeRunRequest
 
@@ -25,7 +26,7 @@ def list_cubes() -> CubeListResponse:
 
 
 @router.post("/run")
-async def run_cube(request: CubeRunRequest) -> dict[str, Any]:
+async def run_cube(request: CubeRunRequest, user: RequiredUser) -> dict[str, Any]:
     """Execute a cube and return its payload verbatim.
 
     Dispatch order:

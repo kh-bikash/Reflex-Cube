@@ -1,6 +1,6 @@
 // frontend/src/components/PromptModel.tsx
 import React, { useState, useEffect } from "react";
-import { createModel, getJobStatus, requestModelZip } from "../lib/api";
+import { createModel, getJobStatus, downloadModel } from "../lib/api";
 import { TrainingTerminal } from "./TrainingTerminal";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Mic } from "lucide-react";
@@ -123,49 +123,15 @@ const PromptModel: React.FC = () => {
   }, [jobId]);
 
   const handleDownloadZip = async () => {
-    if (!jobId) return alert("No job available to download.");
+    if (!jobId) return;
     setZipBusy(true);
     setError(null);
-
     try {
-      const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-
-      // Prefer streaming endpoint which builds a zip in a temp dir and streams back
-      const streamUrl = `${API}/api/models/download-zip-stream/${jobId}`;
-
-      // Open the streaming URL in a new tab to trigger browser download.
-      // Opening immediately on user click avoids popup blocking in most browsers.
-      const win = window.open(streamUrl, "_blank");
-      if (!win) {
-        // Popup blocked — as a fallback, request the zip URL via the POST endpoint and navigate
-        const z = await requestModelZip(jobId);
-        const url = z?.url ?? z?.download_url;
-        if (!url) throw new Error("No zip URL returned by server");
-        const abs = url.startsWith("http") ? url : `${API}${url}`;
-        window.location.href = abs;
-      }
+      // The download endpoint needs an Authorization header, so this fetches
+      // the archive and saves the blob rather than opening a URL in a tab.
+      await downloadModel(jobId);
     } catch (e) {
-      const err = e instanceof Error ? e : new Error(String(e));
-      // Fallback: try POST /download-zip which creates a persistent zip in storage and returns URL
-      try {
-        const z = await requestModelZip(jobId);
-        const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
-        const url = z?.url ?? z?.download_url;
-        if (url) {
-          const abs = url.startsWith("http") ? url : `${API}${url}`;
-          window.open(abs, "_blank");
-        } else {
-          throw new Error("No url returned from download-zip fallback");
-        }
-      } catch (fallbackErr) {
-        const fallbackErrObj = fallbackErr instanceof Error ? fallbackErr : new Error(String(fallbackErr));
-        console.error("zip fallback failed", fallbackErrObj);
-        setError(
-          "Failed to create or download zip. Check backend logs or try again. (" +
-          (fallbackErrObj.message) +
-          ")"
-        );
-      }
+      setError(e instanceof Error ? e.message : "Could not download the model.");
     } finally {
       setZipBusy(false);
     }
@@ -294,14 +260,6 @@ const PromptModel: React.FC = () => {
                     Model <code>{jobId.slice(0,8)}</code> ready.
                   </div>
                   <div className="flex gap-3">
-                      <a
-                        href={`${import.meta.env.VITE_API_URL}/api/models/download/${jobId}`}
-                        className="px-4 py-2 rounded-full hover:bg-white/5 text-sm text-gray-300 transition-colors"
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        Metadata
-                      </a>
                       <button
                         className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium transition-colors"
                         onClick={handleDownloadZip}

@@ -24,7 +24,7 @@ export const AlphaCube = () => {
         if (!ticker) return;
         setLoading(true);
         try {
-            const response = await api.post('/cubes/run', {
+            const response = await api.post<AlphaResult & { status?: string; message?: string }>('/cubes/run', {
                 cube_id: 'alpha',
                 input: { text: ticker }
             });

@@ -29,48 +29,54 @@ class TestCatalog:
 
 
 class TestDispatch:
-    def test_registry_cube_payload_is_returned_verbatim(self, client, stub_registry):
-        body = client.post(
+    """Running a cube requires a signed-in account: it spends CPU."""
+
+    def test_registry_cube_payload_is_returned_verbatim(self, auth_client, stub_registry):
+        body = auth_client.post(
             "/api/cubes/run", json={"cube_id": "echo", "input": {"text": "hi"}}
         ).json()
         assert body == {"status": "success", "echo": {"text": "hi"}}
 
-    def test_string_input_is_coerced(self, client, stub_registry):
-        body = client.post("/api/cubes/run", json={"cube_id": "echo", "input": "hi"}).json()
+    def test_string_input_is_coerced(self, auth_client, stub_registry):
+        body = auth_client.post("/api/cubes/run", json={"cube_id": "echo", "input": "hi"}).json()
         assert body["echo"] == {"text": "hi"}
 
-    def test_null_input_is_accepted(self, client, stub_registry):
-        body = client.post("/api/cubes/run", json={"cube_id": "echo"}).json()
+    def test_null_input_is_accepted(self, auth_client, stub_registry):
+        body = auth_client.post("/api/cubes/run", json={"cube_id": "echo"}).json()
         assert body["echo"] == {}
 
-    def test_cube_id_is_case_insensitive(self, client, stub_registry):
+    def test_cube_id_is_case_insensitive(self, auth_client, stub_registry):
         assert (
-            client.post("/api/cubes/run", json={"cube_id": "ECHO", "input": "x"}).status_code == 200
+            auth_client.post("/api/cubes/run", json={"cube_id": "ECHO", "input": "x"}).status_code
+            == 200
         )
 
-    def test_a_raising_cube_becomes_an_error_payload(self, client, stub_registry):
-        response = client.post("/api/cubes/run", json={"cube_id": "boom", "input": {}})
+    def test_a_raising_cube_becomes_an_error_payload(self, auth_client, stub_registry):
+        response = auth_client.post("/api/cubes/run", json={"cube_id": "boom", "input": {}})
         # 200 with an error body: every console renders this shape.
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "error"
         assert "cube exploded" in body["message"]
 
-    def test_non_dict_return_is_wrapped(self, client, stub_registry):
-        body = client.post("/api/cubes/run", json={"cube_id": "plain", "input": {}}).json()
+    def test_non_dict_return_is_wrapped(self, auth_client, stub_registry):
+        body = auth_client.post("/api/cubes/run", json={"cube_id": "plain", "input": {}}).json()
         assert body == {"status": "success", "result": "just a string"}
 
-    def test_missing_cube_id_is_422(self, client):
-        assert client.post("/api/cubes/run", json={"input": "x"}).status_code == 422
+    def test_missing_cube_id_is_422(self, auth_client):
+        assert auth_client.post("/api/cubes/run", json={"input": "x"}).status_code == 422
 
-    def test_blank_cube_id_is_422(self, client):
-        assert client.post("/api/cubes/run", json={"cube_id": "", "input": "x"}).status_code == 422
+    def test_blank_cube_id_is_422(self, auth_client):
+        assert (
+            auth_client.post("/api/cubes/run", json={"cube_id": "", "input": "x"}).status_code
+            == 422
+        )
 
 
 class TestAgentFallback:
     """Cubes with no Python implementation go to the agent loop."""
 
-    def test_unregistered_cube_uses_the_agent(self, client, stub_registry, monkeypatch):
+    def test_unregistered_cube_uses_the_agent(self, auth_client, stub_registry, monkeypatch):
         import app.brain as brain_module
 
         class FakeBrain:
@@ -78,12 +84,12 @@ class TestAgentFallback:
                 return f"# Report for {cube_id}"
 
         monkeypatch.setattr(brain_module, "get_brain", lambda: FakeBrain())
-        body = client.post(
+        body = auth_client.post(
             "/api/cubes/run", json={"cube_id": "research", "input": "quantum"}
         ).json()
         assert body == {"status": "success", "result": "# Report for research"}
 
-    def test_unavailable_agent_is_503_not_a_crash(self, client, stub_registry, monkeypatch):
+    def test_unavailable_agent_is_503_not_a_crash(self, auth_client, stub_registry, monkeypatch):
         import app.brain as brain_module
 
         class DeadBrain:
@@ -91,11 +97,11 @@ class TestAgentFallback:
                 raise brain_module.BrainUnavailable("torch is not installed")
 
         monkeypatch.setattr(brain_module, "get_brain", lambda: DeadBrain())
-        response = client.post("/api/cubes/run", json={"cube_id": "research", "input": "x"})
+        response = auth_client.post("/api/cubes/run", json={"cube_id": "research", "input": "x"})
         assert response.status_code == 503
         assert "torch is not installed" in response.json()["detail"]
 
-    def test_a_cube_that_failed_to_import_is_503(self, client, monkeypatch):
+    def test_a_cube_that_failed_to_import_is_503(self, auth_client, monkeypatch):
         """A broken cube must not silently fall through to the agent."""
         from app.cubes.registry import CubeRegistry, CubeSpec
         from app.routes import cubes as cubes_route
@@ -103,7 +109,7 @@ class TestAgentFallback:
         broken = CubeRegistry(specs=(CubeSpec("ghost", "no_such_module", "Ghost", "Ghost", "n/a"),))
         monkeypatch.setattr(cubes_route, "registry", broken)
 
-        response = client.post("/api/cubes/run", json={"cube_id": "ghost", "input": {}})
+        response = auth_client.post("/api/cubes/run", json={"cube_id": "ghost", "input": {}})
         assert response.status_code == 503
         assert "failed to load" in response.json()["detail"]
 

@@ -2,13 +2,16 @@
 
 # Reflex Cube API.
 #
-# Builds the core (API-only) image by default — it starts in seconds and serves
-# the cube catalog, job tracking and log streaming. Build with
-# `--build-arg INSTALL_ML=true` to add the training pipeline and the cubes that
-# run models locally; that image is several gigabytes.
-#
-#   docker build -t reflex-cube-api ./backend
+#   docker build -t reflex-cube-api ./backend                          # API only
 #   docker build --build-arg INSTALL_ML=true -t reflex-cube-api:ml ./backend
+#
+# The default image serves the cube catalog, accounts, job tracking and log
+# streaming in a container that builds in under a minute. INSTALL_ML adds the
+# training pipeline and the model-backed cubes.
+#
+# This image is also what deploys to Hugging Face Spaces, which runs containers
+# as uid 1000 and expects the app on $PORT (7860). Both are handled below, so
+# the same Dockerfile serves local Docker, Compose and Spaces.
 
 FROM python:3.11-slim AS base
 
@@ -17,16 +20,19 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-WORKDIR /app
+# Spaces runs the container as uid 1000 with HOME=/home/user. Matching that
+# here means the same image runs unprivileged everywhere.
+RUN useradd --create-home --uid 1000 --shell /bin/bash appuser
 
-# libgomp is needed by torch; curl backs the healthcheck below.
+# libgomp is needed by torch; curl backs the healthcheck.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl libgomp1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Requirements are copied alone so the dependency layer is cached across
-# source changes.
-COPY requirements.txt requirements-ml.txt ./
+WORKDIR /app
+
+# Requirements first, so the dependency layer survives source changes.
+COPY --chown=appuser:appuser requirements.txt requirements-ml.txt ./
 
 ARG INSTALL_ML=false
 RUN pip install --upgrade pip \
@@ -37,24 +43,26 @@ RUN pip install --upgrade pip \
          pip install -r requirements.txt; \
        fi
 
-COPY . .
+COPY --chown=appuser:appuser . .
 
-# Runtime roots. Mount a volume at /data to persist models across containers.
+# Runtime roots. /data is a volume mount locally; on Spaces it is container
+# disk, which is why PUBLISH_MODELS_TO_HUB matters there.
 ENV REFLEX_DATA_DIR=/data \
     STORAGE_PATH=/data/models \
     CUBE_STORAGE_PATH=/data/cubes \
     HF_HOME=/data/huggingface \
-    DATABASE_URL=sqlite:////data/reflex.db
+    DATABASE_URL=sqlite:////data/reflex.db \
+    PORT=8000
 
-# Run unprivileged; /data must be writable by that user.
-RUN useradd --create-home --uid 10001 reflex \
-    && mkdir -p /data \
-    && chown -R reflex:reflex /app /data
-USER reflex
+RUN mkdir -p /data && chown -R appuser:appuser /app /data
+
+USER appuser
 
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-    CMD curl --fail --silent http://localhost:8000/api/health || exit 1
+    CMD curl --fail --silent "http://localhost:${PORT:-8000}/api/health" || exit 1
 
-CMD ["uvicorn", "app.api:app", "--host", "0.0.0.0", "--port", "8000"]
+# $PORT is honoured so the same image runs on Spaces (7860) and on any PaaS
+# that assigns a port at runtime.
+CMD ["sh", "-c", "exec uvicorn app.api:app --host 0.0.0.0 --port ${PORT:-8000}"]

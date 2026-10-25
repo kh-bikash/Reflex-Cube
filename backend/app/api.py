@@ -9,11 +9,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from . import __version__
-from .config import ALLOW_CREDENTIALS, BRAIN_EAGER_LOAD, CORS_ORIGINS
+from .config import ALLOW_CREDENTIALS, BRAIN_EAGER_LOAD, CORS_ORIGINS, startup_warnings
 from .db import init_db, session_scope
 from .logging_config import configure_logging, get_logger
 from .models import JobStatusValue, TrainingJob
-from .routes import cubes, logs, models, system
+from .routes import auth, cubes, logs, models, system
 
 logger = get_logger(__name__)
 
@@ -24,6 +24,9 @@ registry of task-specific **Intelligence Cubes** behind one dispatch endpoint.
 * `POST /api/models/create` queues a prompt; training runs in a subprocess.
 * `GET /api/logs/{job_id}` streams that job's progress as server-sent events.
 * `POST /api/cubes/run` dispatches to a registered cube, or to the agent loop.
+
+Sign in at `POST /api/auth/login` and send the token as `Authorization:
+Bearer <token>`. Jobs belong to the account that created them.
 """
 
 
@@ -48,6 +51,12 @@ def _reap_orphaned_jobs() -> int:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Startup/shutdown hooks (replaces the deprecated `@app.on_event`)."""
     configure_logging()
+
+    # Surfaced here rather than printed at import, so they land in the log with
+    # everything else and a misconfigured deployment is obvious at boot.
+    for warning in startup_warnings():
+        logger.warning(warning)
+
     init_db()
 
     reaped = _reap_orphaned_jobs()
@@ -88,6 +97,7 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(system.router)
+    application.include_router(auth.router)
     application.include_router(models.router)
     application.include_router(cubes.router)
     application.include_router(logs.router)

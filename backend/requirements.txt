@@ -21,6 +21,18 @@ python-dotenv>=1.0,<2.0
 requests>=2.31,<3.0
 aiofiles>=23.1,<25.0
 
+# Accounts: password hashing and session tokens
+bcrypt>=4.1,<6.0
+PyJWT>=2.8,<3.0
+
+# Hosted Postgres. A SQLite file on a hosted container's ephemeral disk is
+# lost on every restart, so any real deployment needs this.
+psycopg[binary]>=3.1,<4.0
+
+# Pushes finished models to the Hub so they outlive the container that trained
+# them. Small and pure-python; the heavy ML stack is a separate file.
+huggingface-hub>=0.23,<1.0
+
 # Markdown -> PDF export (POST /api/cubes/pdf)
 Markdown>=3.5,<4.0
 xhtml2pdf>=0.2.15,<0.3

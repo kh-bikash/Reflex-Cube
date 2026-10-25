@@ -22,38 +22,85 @@ os.environ.setdefault("DATABASE_URL", f"sqlite:///{_TMP_ROOT / 'test.db'}")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:8080")
 os.environ.setdefault("LOG_LEVEL", "WARNING")
 os.environ.setdefault("BRAIN_EAGER_LOAD", "0")
+os.environ.setdefault("JWT_SECRET", "test-secret-that-is-long-enough-for-hs256-abcdef")
 
 from app.cubes.base import Cube  # noqa: E402
 from app.cubes.registry import CubeRegistry  # noqa: E402
 
 
-@pytest.fixture
-def client():
-    """TestClient over a fresh app with an empty database."""
-    from fastapi.testclient import TestClient
+@pytest.fixture(autouse=True)
+def clean_database():
+    """Give every test an empty schema.
 
-    from app.api import create_app
-    from app.db import Base, engine
-
-    Base.metadata.drop_all(bind=engine)
-    with TestClient(create_app()) as test_client:
-        yield test_client
-    Base.metadata.drop_all(bind=engine)
-
-
-@pytest.fixture
-def db_session():
-    """Session against a freshly created schema."""
-    from app.db import Base, SessionLocal, engine, init_db
+    One fixture owns the lifecycle. When `client` and `db_session` each reset
+    the schema themselves, whichever resolves second wipes the rows the first
+    had already created — which silently signed out the test account.
+    """
+    from app.db import Base, engine, init_db
 
     Base.metadata.drop_all(bind=engine)
     init_db()
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture
+def client(clean_database):
+    """TestClient over a fresh app."""
+    from fastapi.testclient import TestClient
+
+    from app.api import create_app
+
+    with TestClient(create_app()) as test_client:
+        yield test_client
+
+
+@pytest.fixture
+def db_session(clean_database):
+    """Session against the test's schema."""
+    from app.db import SessionLocal
+
     session = SessionLocal()
     try:
         yield session
     finally:
         session.close()
-        Base.metadata.drop_all(bind=engine)
+
+
+TEST_EMAIL = "tester@example.com"
+TEST_PASSWORD = "correct-horse-battery"
+
+
+@pytest.fixture
+def account(client):
+    """Register an account and return (profile, auth headers)."""
+    response = client.post(
+        "/api/auth/register",
+        json={"email": TEST_EMAIL, "password": TEST_PASSWORD, "display_name": "Tester"},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    return body["user"], {"Authorization": f"Bearer {body['access_token']}"}
+
+
+@pytest.fixture
+def auth_client(client, account):
+    """TestClient that sends the test account's token on every request."""
+    _profile, headers = account
+    client.headers.update(headers)
+    return client
+
+
+@pytest.fixture
+def other_account(client):
+    """A second account, for checking that users cannot see each other's work."""
+    response = client.post(
+        "/api/auth/register",
+        json={"email": "someone-else@example.com", "password": TEST_PASSWORD},
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    return body["user"], {"Authorization": f"Bearer {body['access_token']}"}
 
 
 class EchoCube(Cube):
@@ -114,7 +161,11 @@ def stub_registry():
 
 @pytest.fixture
 def make_job(db_session):
-    """Factory inserting a TrainingJob row."""
+    """Factory inserting a TrainingJob row.
+
+    Pass `user_id` to attribute it to an account; unowned jobs are visible to
+    any caller, which is the single-user local case.
+    """
     import uuid
 
     from app.models import TrainingJob

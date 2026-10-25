@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, DateTime, Float, Integer, String, Text
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
 
 from .db import Base
 
@@ -35,6 +36,30 @@ class JobStatusValue:
     TERMINAL = (COMPLETED, FAILED, CANCELLED)
 
 
+class User(Base):
+    """An account. Jobs belong to a user, so one person's work is their own."""
+
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, index=True)
+    email = Column(String, nullable=False, unique=True, index=True)
+    display_name = Column(String, nullable=False, default="")
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    #: Per-user Hugging Face token, used to push their trained models to their
+    #: own Hub account. Optional; without it models stay on the server.
+    hf_token = Column(String, nullable=True)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+
+    jobs = relationship("TrainingJob", back_populates="user")
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return f"<User {self.email}>"
+
+
 class TrainingJob(Base):
     __tablename__ = "training_jobs"
 
@@ -54,6 +79,14 @@ class TrainingJob(Base):
 
     result_path = Column(String, nullable=True)
     error = Column(Text, nullable=True)
+
+    #: Hub repo the finished model was pushed to, when model publishing is on.
+    #: Hosted containers have ephemeral disks, so this is what makes a trained
+    #: model outlive the instance that produced it.
+    hub_repo_id = Column(String, nullable=True)
+
+    user_id = Column(String, ForeignKey("users.id"), nullable=True, index=True)
+    user = relationship("User", back_populates="jobs")
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, index=True)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)

@@ -10,7 +10,12 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from .. import __version__
-from ..config import STORAGE_PATH
+from ..config import (
+    ALLOW_REGISTRATION,
+    PUBLISH_MODELS_TO_HUB,
+    REQUIRE_AUTH,
+    STORAGE_PATH,
+)
 from ..cubes.registry import registry
 from ..db import get_db
 from ..logging_config import get_logger
@@ -48,7 +53,20 @@ def health(db: Session = Depends(get_db)) -> HealthResponse:
         database=database,
         cubes=len(registry.list_cubes()),
         storage_path=STORAGE_PATH,
+        auth_required=REQUIRE_AUTH,
+        registration_open=ALLOW_REGISTRATION,
+        # Clients use this to explain why the studio is unavailable instead of
+        # letting a user queue a job that is certain to fail.
+        training_available=_training_available(),
+        model_publishing=PUBLISH_MODELS_TO_HUB,
     )
+
+
+def _training_available() -> bool:
+    """True if the ML stack needed to fine-tune is importable."""
+    from importlib.util import find_spec
+
+    return all(find_spec(name) is not None for name in ("torch", "transformers", "datasets"))
 
 
 @router.post("/api/newsletter/subscribe", response_model=NewsletterResponse)

@@ -232,7 +232,10 @@ const ModelDashboard: React.FC = () => {
                                             out.innerHTML = "Processing...";
                                             try {
                                                 const res = await testModel(job.id, input);
-                                                out.innerText = typeof res.result === 'object' ? JSON.stringify(res.result, null, 2) : res.result;
+                                                out.innerText =
+                                                    typeof res.result === 'object'
+                                                        ? JSON.stringify(res.result, null, 2)
+                                                        : String(res.result);
                                             } catch {
                                                 out.innerText = "ERROR: Inference failed.";
                                             } finally {

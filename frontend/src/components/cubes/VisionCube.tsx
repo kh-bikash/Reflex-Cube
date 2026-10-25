@@ -178,13 +178,16 @@ export const VisionCube = () => {
             setHeatmapImage(null); // Reset
             try {
                 // 1. Predict
-                const res = await api.post('/cubes/run', {
-                    cube_id: 'vision',
-                    input: {
-                        action: 'predict',
-                        image: reader.result
+                const res = await api.post<VisionPrediction & { status?: string; message?: string }>(
+                    '/cubes/run',
+                    {
+                        cube_id: 'vision',
+                        input: {
+                            action: 'predict',
+                            image: reader.result
+                        }
                     }
-                });
+                );
                 if (res.data.status === 'success') {
                     setPrediction(res.data);
 
