@@ -1,8 +1,7 @@
-from typing import Dict, Any, List
+from typing import Any
+
 from .base import Cube
-import requests
-import json
-import random
+
 
 class FitPalCube(Cube):
     @property
@@ -13,16 +12,16 @@ class FitPalCube(Cube):
     def description(self) -> str:
         return "AI Personal Trainer - Logic & Workout Generation."
 
-    def run(self, input_data: Any) -> Dict[str, Any]:
+    def run(self, input_data: Any) -> dict[str, Any]:
         # Input can be a list of equipment strings OR raw text description
         equipment_input = input_data.get("equipment", [])
         goal = input_data.get("goal", "Build Muscle")
         experience = input_data.get("experience", "Intermediate")
-        
+
         # If input is text (comma separated), parse it
         if isinstance(equipment_input, str):
-            equipment_input = [e.strip() for e in equipment_input.split(',')]
-            
+            equipment_input = [e.strip() for e in equipment_input.split(",")]
+
         # Default fallback if empty
         if not equipment_input:
             equipment_input = ["Bodyweight"]
@@ -44,44 +43,40 @@ class FitPalCube(Cube):
                 '  "equipment_used": ["Dumbbells", "Bench"],\n'
                 '  "warmup": [\n'
                 '    {"name": "Arm Circles", "duration": "1 min", "notes": "Dynamic movement"}\n'
-                '  ],\n'
+                "  ],\n"
                 '  "main_circuit": [\n'
                 '    {"name": "Goblet Squats", "sets": 4, "reps": "12-15", "rest": "60s", "notes": "Keep chest up, depth parallel"},\n'
                 '    {"name": "Dumbbell Bench Press", "sets": 4, "reps": "10-12", "rest": "90s", "notes": "Full ROM"}\n'
-                '  ],\n'
+                "  ],\n"
                 '  "cooldown": [\n'
                 '    {"name": "Static Stretching", "duration": "5 min"}\n'
-                '  ],\n'
+                "  ],\n"
                 '  "coach_tip": "Focus on time under tension since weight is limited."\n'
                 "}"
             )
-            
+
             user_prompt = "Generate the workout now. JSON Only."
-            
+
             # API Call via Router
-            from ..utils.ai_router import query_ai, extract_json
-            
-            content = query_ai(system_prompt, user_prompt, model_preference="mistral", allow_pollinations=True)
-            
+            from ..utils.ai_router import extract_json, query_ai
+
+            content = query_ai(
+                system_prompt, user_prompt, model_preference="mistral", allow_pollinations=True
+            )
+
             if content:
                 data = extract_json(content)
                 if not data:
                     raise Exception("Failed to parse AI response.")
-                
+
                 # Ensure structure
                 data["workout_name"] = data.get("workout_name", "Custom Workout")
                 data["main_circuit"] = data.get("main_circuit", [])
-                
-                return {
-                    "status": "success",
-                    "data": data
-                }
+
+                return {"status": "success", "data": data}
             else:
-                 raise Exception("AI Provider Unavailable (All Routes Failed)")
+                raise Exception("AI Provider Unavailable (All Routes Failed)")
 
         except Exception as e:
-            print(f"[FitPal Cube Error] {str(e)}")
-            return {
-                "status": "error", 
-                "message": f"Generation failed: {str(e)}"
-            }
+            print(f"[FitPal Cube Error] {e!s}")
+            return {"status": "error", "message": f"Generation failed: {e!s}"}

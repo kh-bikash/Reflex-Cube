@@ -1,17 +1,24 @@
 import type { Config } from "tailwindcss";
 import tailwindcssAnimate from "tailwindcss-animate";
+import typography from "@tailwindcss/typography";
 
+/**
+ * Every colour here reads a CSS variable defined in `src/index.css`, so the
+ * light and dark themes stay in one place.
+ *
+ * The previous config referenced `--primary-glow`, `--ai-*` and `--sidebar-*`,
+ * none of which existed, and set `font-sans` to Open Sans and `font-display`
+ * to Poppins while the stylesheet only loaded Inter — so both resolved to the
+ * browser's generic fallback.
+ */
 export default {
   darkMode: ["class"],
-  content: ["./pages/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./app/**/*.{ts,tsx}", "./src/**/*.{ts,tsx}"],
-  prefix: "",
+  content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     container: {
       center: true,
-      padding: "2rem",
-      screens: {
-        "2xl": "1400px",
-      },
+      padding: "1.5rem",
+      screens: { "2xl": "1200px" },
     },
     extend: {
       colors: {
@@ -19,19 +26,15 @@ export default {
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
+        surface: "hsl(var(--surface))",
         foreground: "hsl(var(--foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
-          glow: "hsl(var(--primary-glow))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive))",
-          foreground: "hsl(var(--destructive-foreground))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -49,110 +52,94 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // Custom Premium Palette
-        midnight: {
-          900: "#050505", // Deepest black
-          800: "#0a0a0a",
-          700: "#121212",
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))",
         },
-        neon: {
-          cyan: "#00f0ff",
-          purple: "#7b61ff",
-          pink: "#ff0080",
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
         },
-        ai: {
-          green: "hsl(var(--ai-green))",
-          blue: "hsl(var(--ai-blue))",
-          purple: "hsl(var(--ai-purple))",
-          orange: "hsl(var(--ai-orange))",
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(var(--warning-foreground))",
         },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
+        chart: {
+          1: "hsl(var(--chart-1))",
+          2: "hsl(var(--chart-2))",
+          3: "hsl(var(--chart-3))",
+          4: "hsl(var(--chart-4))",
+          5: "hsl(var(--chart-5))",
         },
       },
       fontFamily: {
-        sans: ["Open Sans", "sans-serif"],
-        display: ["Poppins", "sans-serif"],
-        mono: ["IBM Plex Mono", "monospace"],
+        // Inter for everything, IBM Plex Mono for ids, metrics and logs. Both
+        // are loaded in index.css; the stack after each is the system fallback
+        // used before the webfont arrives.
+        sans: [
+          "Inter",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Helvetica Neue",
+          "Arial",
+          "sans-serif",
+        ],
+        mono: ["IBM Plex Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+      },
+      fontSize: {
+        // A display step above Tailwind's defaults, with the tight tracking
+        // large Inter needs.
+        display: ["clamp(2.5rem, 1.5rem + 3.2vw, 4rem)", { lineHeight: "1.05", letterSpacing: "-0.03em" }],
+        title: ["clamp(1.75rem, 1.2rem + 1.6vw, 2.5rem)", { lineHeight: "1.15", letterSpacing: "-0.02em" }],
       },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      boxShadow: {
+        // Restrained elevation: a hairline plus a short, soft drop. Nothing
+        // here should read as a floating card.
+        xs: "0 1px 2px 0 hsl(222 24% 11% / 0.04)",
+        sm: "0 1px 3px 0 hsl(222 24% 11% / 0.06), 0 1px 2px -1px hsl(222 24% 11% / 0.04)",
+        md: "0 4px 12px -2px hsl(222 24% 11% / 0.08), 0 2px 4px -2px hsl(222 24% 11% / 0.04)",
+        lg: "0 12px 32px -8px hsl(222 24% 11% / 0.12)",
+      },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
-        },
-        "cube-float": {
-          "0%, 100%": { transform: "translateY(0px) rotateY(0deg)" },
-          "50%": { transform: "translateY(-10px) rotateY(180deg)" },
-        },
-        "glow-pulse": {
-          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--primary) / 0.3)" },
-          "50%": { boxShadow: "0 0 40px hsl(var(--primary) / 0.6)" },
-        },
-        "gradient-shift": {
-          "0%": { backgroundPosition: "0% 50%" },
-          "50%": { backgroundPosition: "100% 50%" },
-          "100%": { backgroundPosition: "0% 50%" },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
         },
         "fade-in": {
-          "0%": {
-            opacity: "0",
-            transform: "translateY(10px)"
-          },
-          "100%": {
-            opacity: "1",
-            transform: "translateY(0)"
-          }
+          from: { opacity: "0", transform: "translateY(4px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
         },
-        "scale-in": {
-          "0%": {
-            transform: "scale(0.95)",
-            opacity: "0"
-          },
-          "100%": {
-            transform: "scale(1)",
-            opacity: "1"
-          }
+        shimmer: {
+          "100%": { transform: "translateX(100%)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "cube-float": "cube-float 6s ease-in-out infinite",
-        "glow-pulse": "glow-pulse 3s ease-in-out infinite",
-        "gradient-shift": "gradient-shift 8s ease-in-out infinite",
-        "fade-in": "fade-in 0.6s ease-out",
-        "scale-in": "scale-in 0.4s ease-out",
+        // Motion is for orientation, not ornament: short, once, and never
+        // competing with the content.
+        "fade-in": "fade-in 0.25s ease-out",
+        shimmer: "shimmer 1.6s infinite",
       },
-      backgroundImage: {
-        "gradient-hero": "var(--gradient-hero)",
-        "gradient-card": "var(--gradient-card)",
-        "gradient-border": "var(--gradient-border)",
+      transitionTimingFunction: {
+        standard: "cubic-bezier(0.2, 0, 0, 1)",
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [tailwindcssAnimate, typography],
 } satisfies Config;

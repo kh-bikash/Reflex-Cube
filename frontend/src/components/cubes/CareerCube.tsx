@@ -287,8 +287,8 @@ export default function CareerCube() {
                             </div>
 
                             {/* Content Viewer */}
-                            <div className="flex-1 overflow-y-auto bg-white p-12 text-gray-900 shadow-inner custom-scrollbar relative">
-                                <div className="max-w-[800px] mx-auto min-h-[1000px] bg-white">
+                            <div className="flex-1 overflow-y-auto bg-card p-12 text-foreground shadow-inner custom-scrollbar relative">
+                                <div className="max-w-[800px] mx-auto min-h-[1000px] bg-card">
                                     {/* Separate div for print logic */}
                                     <div id="markdown-source" className="hidden">
                                         <ReactMarkdown>

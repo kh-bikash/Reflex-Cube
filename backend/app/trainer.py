@@ -1,368 +1,606 @@
+"""Prompt-to-model training pipeline.
+
+`run_training_job` is what `train_worker.py` executes in its own process:
+it resolves a task, model and dataset from the prompt, downloads the real
+dataset, fine-tunes, evaluates, and saves the checkpoint — streaming progress
+into a JSONL file that the SSE endpoint tails and into the job row the status
+endpoint reads.
+
+torch/transformers/datasets are imported *inside* the functions that need them.
+The module therefore imports on a machine without the ML extra, which lets the
+API and the test suite reason about job state without a multi-gigabyte install.
+"""
+
+from __future__ import annotations
+
+import contextlib
 import json
+import time
 import traceback
 from pathlib import Path
-import torch
-from transformers import (
-    pipeline,
-    AutoTokenizer,
-    AutoModelForSeq2SeqLM,
-    AutoModelForSequenceClassification,
-    AutoModelForCausalLM,
-    AutoModelForTokenClassification,
-    Trainer,
-    TrainingArguments,
-    TrainerCallback,
-    DataCollatorForTokenClassification,
+from typing import Any
+
+from .config import (
+    MAX_EVAL_SAMPLES,
+    MAX_MODEL_PARAMETERS,
+    MAX_TRAIN_SAMPLES,
+    MAX_TRAIN_SECONDS,
+    STORAGE_PATH,
+    TRAIN_BATCH_SIZE,
+    TRAIN_EPOCHS,
+    TRAIN_LEARNING_RATE,
+    TRAIN_MAX_LENGTH,
+    TRUST_REMOTE_CODE,
 )
-from datasets import load_dataset, Dataset
-import pandas as pd
-import requests
-from .db import SessionLocal
-from .models import TrainingJob
-from .config import STORAGE_PATH
+from .db import session_scope
+from .logging_config import get_logger
+from .models import JobStatusValue, TrainingJob
+from .utils import TRAINING_LOG_NAME, append_jsonl
 
-import sys
-import os
+logger = get_logger(__name__)
 
-# Ensure stdout is UTF-8 to avoid Windows encoding crashes
-try:
-    sys.stdout.reconfigure(encoding='utf-8')
-except:
-    pass
+#: Canonical Hugging Face task name per task the UI can request.
+HF_TASK_ALIASES = {
+    "sentiment-analysis": "text-classification",
+    "classification": "text-classification",
+    "ner": "token-classification",
+    "dialogue": "text-generation",
+}
 
-def safe_print(msg):
-    try:
-        print(msg, flush=True)
-    except Exception:
-        pass # If printing fails, just start silent but don't crash the job
+#: Column names searched, in order, when mapping a dataset onto model inputs.
+TEXT_COLUMNS = ("text", "document", "sentence", "content", "article", "context", "question")
+TARGET_COLUMNS = ("summary", "highlights", "target", "translation", "answers")
+LABEL_COLUMNS = ("label", "labels", "label_ids", "ner_tags", "class", "category", "sentiment")
 
-from sqlalchemy import Float
 
-# Update job in DB
-def update_job(job_id, status=None, progress=None, epoch=None, loss=None, accuracy=None, result_path=None, error_msg=None, task=None):
-    db = SessionLocal()
-    job = db.query(TrainingJob).filter(TrainingJob.id == job_id).first()
-    if job:
-        if status:
-            job.status = status
-        if progress is not None:
-            job.progress = progress
-        if epoch is not None:
-            job.epoch = epoch
-        if loss is not None:
-            job.loss = loss
-        if accuracy is not None:
-            job.accuracy = accuracy
-        if result_path:
-            job.result_path = result_path
+# ---------------------------------------------------------------------------
+# Job state
+# ---------------------------------------------------------------------------
+
+
+def update_job(job_id: str, **fields: Any) -> None:
+    """Patch a job row. Unknown or `None` values are ignored.
+
+    `error` appends rather than replaces, so a fallback attempt does not erase
+    the reason the first attempt failed.
+    """
+    error_msg = fields.pop("error_msg", None)
+    with session_scope() as session:
+        job = session.get(TrainingJob, job_id)
+        if job is None:
+            logger.warning("update_job: no job %s", job_id)
+            return
+        for key, value in fields.items():
+            if value is not None and hasattr(job, key):
+                setattr(job, key, value)
         if error_msg:
-            job.error = (job.error or "") + ("\n" + error_msg if job.error else error_msg)
-        if task:
-            job.task = task
-        db.commit()
-    db.close()
+            job.error = f"{job.error}\n{error_msg}" if job.error else str(error_msg)
 
 
-# Strict Real Dataset Loader
-def safe_load_dataset(name: str):
-    safe_print(f"[Trainer] 🌍 Fetching REAL dataset '{name}' from Hugging Face Hub...")
+# ---------------------------------------------------------------------------
+# Task resolution
+# ---------------------------------------------------------------------------
+
+
+def detect_task(prompt: str, requested: str | None = None) -> str:
+    """Resolve the Hugging Face task for a prompt.
+
+    An explicit request wins; otherwise keyword heuristics decide, defaulting to
+    text classification — the task with the widest dataset coverage.
+    """
+    if requested and requested not in ("auto", ""):
+        return HF_TASK_ALIASES.get(requested, requested)
+
+    lowered = prompt.lower()
+    if "summar" in lowered:
+        return "summarization"
+    if "translat" in lowered:
+        return "translation"
+    if any(word in lowered for word in ("sentiment", "opinion", "review", "polarity")):
+        return "text-classification"
+    if any(word in lowered for word in ("entity", "ner", "token tag", "part of speech")):
+        return "token-classification"
+    if any(word in lowered for word in ("question", "answer", "qa ")):
+        return "question-answering"
+    if any(
+        word in lowered
+        for word in ("classif", "categor", "label", "detect", "identify", "spam", "topic")
+    ):
+        return "text-classification"
+    if any(word in lowered for word in ("generat", "write", "story", "chat", "poem")):
+        return "text-generation"
+    return "text-classification"
+
+
+def load_dataset_strict(name: str):
+    """Download a real dataset from the Hub. Never substitutes mock data.
+
+    `name` may carry a config after a comma, e.g. `"wikitext,wikitext-2-raw-v1"`.
+    """
+    from datasets import load_dataset
+
+    logger.info("Fetching dataset %r from the Hugging Face Hub…", name)
     try:
-        # Enforce real download. No mocks.
         if "," in name:
-            base_name, config_name = name.split(",", 1)
-            ds = load_dataset(base_name, config_name, trust_remote_code=True)
+            base, config = name.split(",", 1)
+            dataset = load_dataset(base, config, trust_remote_code=TRUST_REMOTE_CODE)
         else:
-            ds = load_dataset(name, trust_remote_code=True)
-        safe_print(f"[Trainer] ✅ Successfully loaded '{name}'. Size: {len(ds['train'] if 'train' in ds else ds)} rows.")
-        return ds
-    except Exception as e:
-        safe_print(f"[Trainer] ❌ FAILED to load dataset '{name}': {e}")
-        # Critical: Propagate error to fail the job. Do NOT return dummy data.
-        raise RuntimeError(f"Could not fetch real dataset '{name}'. Reason: {e}")
+            dataset = load_dataset(name, trust_remote_code=TRUST_REMOTE_CODE)
+    except Exception as exc:
+        raise RuntimeError(f"Could not fetch dataset {name!r}: {exc}") from exc
 
-# (Removed safe_load_dataset_real and dummy fallbacks)
+    logger.info("Loaded %r.", name)
+    return dataset
 
 
-class StreamLogCallback(TrainerCallback):
-    def __init__(self, log_func, job_id=None):
-        self.log_func = log_func
-        self.job_id = job_id
+def _pick_column(available: Any, candidates: tuple[str, ...]) -> str | None:
+    """First candidate present in `available`, else None."""
+    return next((name for name in candidates if name in available), None)
 
-    def on_log(self, args, state, control, logs=None, **kwargs):
-        if logs:
-            # We want to log 'loss', 'epoch', 'step'
-            # logs is a dict
-            self.log_func(logs)
-            
-            # Also print to terminal
-            step = logs.get("step", state.global_step)
-            loss = logs.get("loss", 0.0)
-            epoch = logs.get("epoch", 0.0)
-            safe_print(f"[Training] Step {step} | Epoch {epoch} | Loss: {loss}")
-            
-            # Update DB with metrics if job_id provided
-            if self.job_id:
-                # Calculate progress based on epoch (assuming 1 epoch for now as per TrainingArguments)
-                # If epochs > 1, this logic needs adjustment (epoch / num_train_epochs * 50 + 50)
-                # For now, simplistic:
-                try:
-                    update_job(self.job_id, epoch=epoch, loss=loss)
-                except:
-                    pass
 
-def run_training_job(job_data, job_id):
-    safe_print(f"[Trainer] THREAD ENTERED for job {job_id}")
+def _label_metadata(features: Any) -> tuple[int, dict[int, str], dict[str, int]]:
+    """Derive label count and id<->name maps from a dataset's features."""
+    for column in ("label", "labels", "ner_tags"):
+        feature = features.get(column) if hasattr(features, "get") else None
+        if feature is None:
+            continue
+        # Sequence features (NER) carry the class list on `.feature`.
+        inner = getattr(feature, "feature", feature)
+        names = getattr(inner, "names", None)
+        if names:
+            return len(names), dict(enumerate(names)), {n: i for i, n in enumerate(names)}
+        num_classes = getattr(inner, "num_classes", None)
+        if num_classes:
+            return (
+                num_classes,
+                {i: f"LABEL_{i}" for i in range(num_classes)},
+                {f"LABEL_{i}": i for i in range(num_classes)},
+            )
+    return 2, {0: "LABEL_0", 1: "LABEL_1"}, {"LABEL_0": 0, "LABEL_1": 1}
+
+
+# ---------------------------------------------------------------------------
+# Training
+# ---------------------------------------------------------------------------
+
+
+def _build_callback(log_event, job_id: str):
+    """Trainer callback that mirrors each log line into JSONL and the DB."""
+    from transformers import TrainerCallback
+
+    class StreamLogCallback(TrainerCallback):
+        def on_log(self, args, state, control, logs=None, **kwargs):
+            if not logs:
+                return
+            event = {
+                "stage": "training",
+                "step": logs.get("step", state.global_step),
+                "epoch": round(float(logs.get("epoch", 0.0)), 4),
+                **{k: v for k, v in logs.items() if isinstance(v, (int, float))},
+            }
+            log_event(event)
+
+            total = state.max_steps or 0
+            # Training occupies the 50-95% band; 0-50 is setup, 95-100 is saving.
+            progress = 50 + int(45 * state.global_step / total) if total else 50
+            update_job(
+                job_id,
+                epoch=float(logs.get("epoch", 0.0)),
+                loss=logs.get("loss"),
+                progress=min(progress, 95),
+            )
+
+    return StreamLogCallback()
+
+
+def _compute_metrics(eval_pred):
+    """Accuracy for single-label classification."""
+    import numpy as np
+
+    logits, labels = eval_pred
+    if isinstance(logits, tuple):
+        logits = logits[0]
+    predictions = np.argmax(logits, axis=-1)
+    labels = np.asarray(labels)
+    if predictions.shape != labels.shape:
+        return {}
+    mask = labels != -100  # token classification pads with -100
+    if not mask.any():
+        return {}
+    return {"accuracy": float((predictions[mask] == labels[mask]).mean())}
+
+
+def run_training_job(job_data: dict[str, Any], job_id: str) -> None:
+    """Run one prompt-to-model job end to end.
+
+    Always reaches a terminal job status: on any failure the job is marked
+    `failed`, the traceback is written next to the checkpoint, and a `failed`
+    event is appended to the log so the SSE stream can close.
+    """
+    prompt = (job_data.get("prompt") or "").strip()
+
+    # Bound before the try block: the previous version built these inside it,
+    # so a failure during setup raised NameError in the handler and buried the
+    # real error.
+    job_dir = Path(STORAGE_PATH) / job_id
+    job_dir.mkdir(parents=True, exist_ok=True)
+    log_file = job_dir / TRAINING_LOG_NAME
+
+    def log_event(event: dict[str, Any]) -> None:
+        try:
+            append_jsonl(log_file, event)
+        except OSError as exc:
+            logger.warning("Could not write training log: %s", exc)
+
     try:
-        prompt = job_data.get("prompt", "")
-        job_dir = Path(STORAGE_PATH) / job_id
-        job_dir.mkdir(parents=True, exist_ok=True)
-        log_file = job_dir / "training_log.jsonl"
-
-        def log_event(event):
-            try:
-                with open(log_file, "a", encoding="utf-8") as f:
-                    f.write(json.dumps(event) + "\n")
-                    f.flush()
-                    os.fsync(f.fileno())
-            except Exception as e:
-                safe_print(f"Log error: {e}")
-
-        # IMMEDIATE LOGGING to unblock frontend
         log_event({"stage": "initializing", "msg": "Job received by trainer"})
-        
-        update_job(job_id, status="initializing", progress=5)
-        safe_print(f"[AI Prompt] {prompt}")
+        update_job(job_id, status=JobStatusValue.INITIALIZING, progress=5)
 
-        # Detect task
-        update_job(job_id, status="analyzing_prompt", progress=15)
-        
-        user_task = job_data.get("task")
-        if user_task and user_task != "auto":
-            task = user_task
-            safe_print(f"[AI Decision] → {task} (User Selected)")
-        else:
-            task = "text-generation" # Default
-            p_lower = prompt.lower()
-            
-            if "summar" in p_lower:
-                task = "summarization"
-            elif "translat" in p_lower:
-                task = "translation"
-            elif "sentiment" in p_lower or "opinion" in p_lower or "review" in p_lower:
-                task = "sentiment-analysis"
-            elif "classif" in p_lower or "categor" in p_lower or "tag" in p_lower or "label" in p_lower or "detect" in p_lower or "identify" in p_lower:
-                task = "text-classification"
-            elif "question" in p_lower or "answer" in p_lower:
-                task = "question-answering"
-                
-            safe_print(f"[AI Decision] → {task} (Heuristic)")
+        # 1. Resolve the task.
+        update_job(job_id, status=JobStatusValue.ANALYZING_PROMPT, progress=15)
+        task = detect_task(prompt, job_data.get("task"))
+        logger.info("Resolved task %r for prompt %r", task, prompt[:80])
+        log_event({"stage": "task_resolved", "task": task})
 
+        # 2. Resolve a base model and a dataset.
         from .interpreter import interpreter
-        
-        # Determine strict task name for HF
-        hf_task_name = "text-classification" # default
-        if "summar" in task or task == "summarization": hf_task_name = "summarization"
-        elif "translat" in task or task == "translation": hf_task_name = "translation"
-        elif "generat" in task or task == "text-generation": hf_task_name = "text-generation"
-        elif "dialog" in task or task == "dialogue": hf_task_name = "text-generation" # dialogue usually uses causal models
-        elif "ner" in task or "token" in task: hf_task_name = "token-classification"
-        elif "question" in task: hf_task_name = "question-answering"
-        
-        # DYNAMIC RESOLUTION
-        config = interpreter.parse_and_resolve(prompt, hf_task_name)
-        
+
+        config = interpreter.parse_and_resolve(prompt, task)
         model_name = config["model_name"]
         dataset_name = config["dataset_name"]
+        update_job(job_id, task=task, model_name=model_name, dataset_name=dataset_name)
+        log_event({"stage": "resolved", "model": model_name, "dataset": dataset_name})
 
-        # FORCE OVERRIDE for Sentiment (Interpreter often picks ag_news/glue which are tricky)
-        if task == "sentiment-analysis":
-            dataset_name = "imdb"
-            safe_print(f"[Override] Forcing dataset 'imdb' for sentiment analysis to ensure positive/negative labels.")
-        
-        elif task == "text-classification" and "news" in prompt.lower():
-            dataset_name = "ag_news"
-            safe_print(f"[Override] Forcing dataset 'ag_news' for news classification to ensure standard categories.")
-        # Update task to match what interpreter decided (e.g. might have refined it)
-        # Update task to match what interpreter decided (e.g. might have refined it)
-        # task = config["task"] 
-        update_job(job_id, task=task) # Persist detected task type 
-
-
-        safe_print(f"[Trainer] Loading dataset {dataset_name} for task {task}...")
-        update_job(job_id, status=f"loading_data_{dataset_name}", progress=20)
+        # 3. Download the dataset, falling back once on failure.
+        update_job(job_id, status=JobStatusValue.LOADING_DATA, progress=20)
         try:
-            ds = safe_load_dataset(dataset_name)
-        except RuntimeError as e:
-            fallback_name = interpreter.get_fallback_dataset(task, prompt)
-            safe_print(f"[Trainer] Primary dataset '{dataset_name}' failed. Trying fallback '{fallback_name}'...")
-            dataset_name = fallback_name
-            ds = safe_load_dataset(dataset_name)
-            
-        train_ds = ds["train"] if "train" in ds else ds
+            raw = load_dataset_strict(dataset_name)
+        except RuntimeError as exc:
+            fallback = interpreter.get_fallback_dataset(task, prompt)
+            logger.warning("Dataset %r failed (%s); trying %r", dataset_name, exc, fallback)
+            log_event({"stage": "dataset_fallback", "from": dataset_name, "to": fallback})
+            update_job(job_id, error_msg=f"Dataset {dataset_name!r} unavailable: {exc}")
+            dataset_name = fallback
+            update_job(job_id, dataset_name=dataset_name)
+            raw = load_dataset_strict(dataset_name)
 
-        # FULL POWER MODE: No truncation. Converting to list to avoid some streaming issues on Windows if needed, 
-        # but generally keeping it as dataset object is better for memory. 
-        # train_ds is ready to go.
-        safe_print(f"[Trainer] Training on FULL dataset: {len(train_ds)} samples. This may take a while.")
-
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-        if tokenizer.pad_token is None:
-            tokenizer.pad_token = tokenizer.eos_token
-
-        # Preprocessing
-        def preprocess(examples):
-            # Try common column names for INPUT
-            text_col = next((col for col in ["text", "document", "context", "sentence"] if col in examples), None)
-            if not text_col:
-                # If no known column, try the first one that contains strings
-                for k, v in examples.items():
-                    if isinstance(v, list) and len(v) > 0 and isinstance(v[0], str):
-                        text = v
-                        text_col = k 
-                        break
-                else:
-                    text = [""] * len(examples[next(iter(examples))])
-            else:
-                text = examples[text_col]
-            
-            # Ensure text is cast to string to avoid tokenizing floats
-            if isinstance(text, list):
-                text = [str(t) if t is not None else "" for t in text]
-            
-            # Tokenize INPUT
-            enc = tokenizer(text, truncation=True, padding="max_length", max_length=128)
-            
-            # HANDLE LABELS based on task
-            if task in ["text-generation", "dialogue"]:
-                # For CausalLM, labels = input_ids
-                enc["labels"] = enc["input_ids"].copy()
-                
-            elif task in ["summarization", "translation"]:
-                # For Seq2Seq, we need a target
-                target_col = next((col for col in ["summary", "target", "label", "translation"] if col in examples and col != text_col), None)
-                if target_col:
-                    targets = examples[target_col]
-                    if isinstance(targets, list):
-                        targets = [str(t) if t is not None else "" for t in targets]
-                    with tokenizer.as_target_tokenizer():
-                         labels = tokenizer(targets, truncation=True, padding="max_length", max_length=128)
-                    enc["labels"] = labels["input_ids"]
-                else:
-                    enc["labels"] = enc["input_ids"].copy()
-
-            else:
-                 # Default to Classification (sentiment, topic, ner, qa, etc.)
-                 # Try to find a label column with expanded heuristics
-                 potential_label_cols = ["label", "label_ids", "ner_tags", "year", "class", "category", "target", "int_label", "sentiment"]
-                 label_col = next((col for col in potential_label_cols if col in examples), None)
-                 
-                 if label_col:
-                     enc["labels"] = examples[label_col]
-                 else:
-                     # Fallback dummy labels if absolutely nothing found (prevents crash)
-                     enc["labels"] = [0] * len(text)
-
-            return enc
-
-        # Remove columns that are not model inputs to avoid passing random data
-        tokenized = train_ds.map(preprocess, batched=True, remove_columns=train_ds.column_names)
-
-        # Determine number of labels dynamically
-        num_labels = 2
-        id2label = {}
-        label2id = {}
-        
-        if "label" in train_ds.features:
-            feat = train_ds.features["label"]
-            if hasattr(feat, "num_classes"):
-                 num_labels = feat.num_classes
-            if hasattr(feat, "names"):
-                 # Create mapping: 0 -> "negative", 1 -> "positive"
-                 id2label = {i: name for i, name in enumerate(feat.names)}
-                 label2id = {name: i for i, name in enumerate(feat.names)}
-        elif "ner_tags" in train_ds.features:
-             # Similar for NER if needed
-             if hasattr(train_ds.features["ner_tags"], "feature") and hasattr(train_ds.features["ner_tags"].feature, "num_classes"):
-                 num_labels = train_ds.features["ner_tags"].feature.num_classes
-                 names = train_ds.features["ner_tags"].feature.names
-                 id2label = {i: name for i, name in enumerate(names)}
-                 label2id = {name: i for i, name in enumerate(names)}
-
-        if not id2label:
-            id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
-            label2id = {f"LABEL_{i}": i for i in range(num_labels)}
-
-        safe_print(f"[Trainer] Detected {num_labels} labels: {list(id2label.values())}")
-
-        # Model type selection
-        data_collator = None
-        
-        if task in ["summarization", "translation"]:
-            model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-        elif task == "text-generation":
-            model = AutoModelForCausalLM.from_pretrained(model_name)
-        elif task == "ner":
-            model = AutoModelForTokenClassification.from_pretrained(
-                model_name, 
-                num_labels=num_labels,
-                id2label=id2label,
-                label2id=label2id
-            )
-            data_collator = DataCollatorForTokenClassification(tokenizer)
-        else:
-            model = AutoModelForSequenceClassification.from_pretrained(
-                model_name, 
-                num_labels=num_labels,
-                id2label=id2label,
-                label2id=label2id
-            )
-        
-        if tokenizer.pad_token_id is not None:
-            model.config.pad_token_id = tokenizer.pad_token_id
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        model.to(device)
-
-        args = TrainingArguments(
-            output_dir=str(job_dir),
-            num_train_epochs=1,
-            per_device_train_batch_size=4,
-            learning_rate=2e-5,
-            logging_dir=str(job_dir / "logs"),
-            logging_steps=10,
-            report_to="none",
-            save_strategy="epoch",
-            remove_unused_columns=False, # We handle this manually
-            disable_tqdm=True, # Prevent Windows encoding crashes with progress bars
+        train_split, eval_split = _split(raw)
+        log_event(
+            {
+                "stage": "data_ready",
+                "dataset": dataset_name,
+                "train_rows": len(train_split),
+                "eval_rows": len(eval_split) if eval_split is not None else 0,
+            }
         )
 
-        trainer = Trainer(
-            model=model, 
-            args=args, 
-            train_dataset=tokenized,
-            data_collator=data_collator,
-            callbacks=[StreamLogCallback(log_event, job_id=job_id)]
+        # 4. Tokenize, build the model, train.
+        update_job(job_id, status=JobStatusValue.TRAINING, progress=45)
+        metrics = _train(
+            job_id=job_id,
+            job_dir=job_dir,
+            task=task,
+            model_name=model_name,
+            train_split=train_split,
+            eval_split=eval_split,
+            log_event=log_event,
         )
-        update_job(job_id, status="training", progress=50)
-        log_event({"stage": "training_started", "task": task, "model": model_name})
-        
-        # Ensure only valid columns are passed for sure
-        # "input_ids", "attention_mask", "labels" are standard
-        safe_print(f"[DEBUG] Dataset columns: {tokenized.column_names}")
 
-        trainer.train()
+        # Publish before marking complete, so a job reported as finished has
+        # its model somewhere that outlives this container.
+        hub_repo_id = _publish(
+            job_id=job_id,
+            job_dir=job_dir,
+            job_name=job_data.get("name") or "model",
+            prompt=prompt,
+            task=task,
+            base_model=model_name,
+            dataset=dataset_name,
+            metrics=metrics,
+            log_event=log_event,
+        )
 
-        model.save_pretrained(str(job_dir))
-        tokenizer.save_pretrained(str(job_dir))
-        update_job(job_id, status="completed", progress=100, result_path=str(job_dir))
-        log_event({"stage": "completed", "job_id": job_id, "task": task})
+        update_job(
+            job_id,
+            status=JobStatusValue.COMPLETED,
+            progress=100,
+            result_path=str(job_dir),
+            hub_repo_id=hub_repo_id,
+            accuracy=metrics.get("eval_accuracy"),
+            loss=metrics.get("eval_loss") or metrics.get("train_loss"),
+        )
+        log_event(
+            {
+                "stage": "completed",
+                "job_id": job_id,
+                "task": task,
+                "hub_repo_id": hub_repo_id,
+                **metrics,
+            }
+        )
+        logger.info("Job %s completed (%s).", job_id, task)
 
-        safe_print(f"[Trainer] ✅ Model trained successfully on {task}")
-
-    except Exception as e:
+    except Exception as exc:
         tb = traceback.format_exc()
-        update_job(job_id, status="failed", error_msg=str(e))
-        log_event({"stage": "failed", "error": str(e)})
-        with open(job_dir / "error.txt", "w") as f:
-            f.write(tb)
-        safe_print(tb) # safe print traceback
+        logger.error("Job %s failed: %s", job_id, exc)
+        update_job(job_id, status=JobStatusValue.FAILED, error_msg=str(exc))
+        log_event({"stage": "failed", "error": str(exc)})
+        with contextlib.suppress(OSError):
+            (job_dir / "error.txt").write_text(tb, encoding="utf-8")
+
+
+class TrainingBudgetExceeded(RuntimeError):
+    """Raised when a run passes its wall-clock budget."""
+
+
+def _build_budget_callback(deadline: float | None):
+    """Stop training once `deadline` passes, so a job cannot run forever."""
+    from transformers import TrainerCallback
+
+    class BudgetCallback(TrainerCallback):
+        def on_step_end(self, args, state, control, **kwargs):
+            if deadline is not None and time.monotonic() > deadline:
+                # Asking the Trainer to stop lets it finish the step and save
+                # cleanly, rather than killing it mid-update.
+                control.should_training_stop = True
+                self.exceeded = True
+            return control
+
+        exceeded = False
+
+    return BudgetCallback()
+
+
+def check_model_fits(model) -> None:
+    """Refuse a model too large for this instance to fine-tune.
+
+    Raises:
+        RuntimeError: with a message naming the model's size and the limit.
+    """
+    if MAX_MODEL_PARAMETERS <= 0:
+        return
+    parameters = sum(p.numel() for p in model.parameters())
+    if parameters > MAX_MODEL_PARAMETERS:
+        raise RuntimeError(
+            f"This model has {parameters / 1e6:.0f}M parameters, above the "
+            f"{MAX_MODEL_PARAMETERS / 1e6:.0f}M this server can fine-tune. "
+            "Ask for a smaller architecture in the prompt (for example "
+            "'using distilbert'), or raise MAX_MODEL_PARAMETERS."
+        )
+
+
+def _publish(
+    *, job_id, job_dir, job_name, prompt, task, base_model, dataset, metrics, log_event
+) -> str | None:
+    """Push the finished model to the Hub, if publishing is configured.
+
+    Best-effort: a push failure is recorded on the job but does not fail it.
+    The model is still on disk for as long as this instance lives.
+    """
+    from . import publisher
+
+    token = _owner_hub_token(job_id)
+    if not publisher.is_enabled(token):
+        return None
+
+    update_job(job_id, progress=99)
+    log_event({"stage": "publishing"})
+    try:
+        repo_id = publisher.publish(
+            model_dir=job_dir,
+            job_id=job_id,
+            job_name=job_name,
+            prompt=prompt,
+            task=task,
+            base_model=base_model,
+            dataset=dataset,
+            metrics=metrics,
+            user_token=token,
+        )
+    except publisher.PublishError as exc:
+        logger.warning("Job %s: could not publish: %s", job_id, exc)
+        update_job(job_id, error_msg=f"Model trained, but publishing failed: {exc}")
+        log_event({"stage": "publish_failed", "error": str(exc)})
+        return None
+
+    log_event({"stage": "published", "repo_id": repo_id, "url": publisher.hub_url(repo_id)})
+    return repo_id
+
+
+def _owner_hub_token(job_id: str) -> str | None:
+    """The job owner's own Hub token, so the model lands in their account."""
+    from .models import User
+
+    with session_scope() as session:
+        job = session.get(TrainingJob, job_id)
+        if job is None or not job.user_id:
+            return None
+        user = session.get(User, job.user_id)
+        return user.hf_token if user else None
+
+
+def _split(raw):
+    """Pick train/eval splits and cap them to the configured sample budgets."""
+    if hasattr(raw, "keys"):
+        train = raw.get("train") or raw[next(iter(raw.keys()))]
+        evaluation = raw.get("test") or raw.get("validation")
+    else:
+        train, evaluation = raw, None
+
+    if MAX_TRAIN_SAMPLES > 0 and len(train) > MAX_TRAIN_SAMPLES:
+        # Shuffle first: many corpora are ordered by label, and head-slicing an
+        # ordered corpus yields a single-class training set.
+        train = train.shuffle(seed=42).select(range(MAX_TRAIN_SAMPLES))
+
+    if evaluation is not None and MAX_EVAL_SAMPLES > 0:
+        size = min(len(evaluation), MAX_EVAL_SAMPLES)
+        evaluation = evaluation.shuffle(seed=42).select(range(size))
+    elif MAX_EVAL_SAMPLES <= 0:
+        evaluation = None
+
+    return train, evaluation
+
+
+def _train(*, job_id, job_dir, task, model_name, train_split, eval_split, log_event):
+    """Tokenize, build the right model head, fine-tune and save."""
+    import torch
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoModelForSeq2SeqLM,
+        AutoModelForSequenceClassification,
+        AutoModelForTokenClassification,
+        AutoTokenizer,
+        DataCollatorForTokenClassification,
+        Trainer,
+        TrainingArguments,
+    )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    if tokenizer.pad_token is None:
+        # GPT-style tokenizers have no pad token; reuse EOS so batching works.
+        tokenizer.pad_token = tokenizer.eos_token
+
+    columns = train_split.column_names
+    text_col = _pick_column(columns, TEXT_COLUMNS) or columns[0]
+    label_col = _pick_column(columns, LABEL_COLUMNS)
+    target_col = next((c for c in TARGET_COLUMNS if c in columns and c != text_col), None)
+    num_labels, id2label, label2id = _label_metadata(train_split.features)
+
+    def preprocess(examples):
+        texts = [str(value) if value is not None else "" for value in examples[text_col]]
+        encoded = tokenizer(
+            texts, truncation=True, padding="max_length", max_length=TRAIN_MAX_LENGTH
+        )
+
+        if task == "text-generation":
+            encoded["labels"] = [ids.copy() for ids in encoded["input_ids"]]
+        elif task in ("summarization", "translation"):
+            if target_col:
+                targets = [
+                    str(value) if value is not None else "" for value in examples[target_col]
+                ]
+            else:
+                targets = texts
+            # `text_target=` replaces the deprecated `as_target_tokenizer()`.
+            encoded["labels"] = tokenizer(
+                text_target=targets,
+                truncation=True,
+                padding="max_length",
+                max_length=TRAIN_MAX_LENGTH,
+            )["input_ids"]
+        elif label_col:
+            encoded["labels"] = examples[label_col]
+        else:
+            encoded["labels"] = [0] * len(texts)
+        return encoded
+
+    tokenized_train = train_split.map(
+        preprocess, batched=True, remove_columns=train_split.column_names
+    )
+    tokenized_eval = (
+        eval_split.map(preprocess, batched=True, remove_columns=eval_split.column_names)
+        if eval_split is not None
+        else None
+    )
+
+    data_collator = None
+    compute_metrics = None
+
+    if task in ("summarization", "translation"):
+        model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
+    elif task == "text-generation":
+        model = AutoModelForCausalLM.from_pretrained(model_name)
+    elif task == "token-classification":
+        model = AutoModelForTokenClassification.from_pretrained(
+            model_name, num_labels=num_labels, id2label=id2label, label2id=label2id
+        )
+        # Previously keyed off a task name the pipeline never produced, so the
+        # collator was never attached and ragged tag sequences failed to batch.
+        data_collator = DataCollatorForTokenClassification(tokenizer)
+        compute_metrics = _compute_metrics
+    else:
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, num_labels=num_labels, id2label=id2label, label2id=label2id
+        )
+        compute_metrics = _compute_metrics
+
+    if tokenizer.pad_token_id is not None:
+        model.config.pad_token_id = tokenizer.pad_token_id
+
+    check_model_fits(model)
+
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    logger.info(
+        "Training %s on %s: %d rows, %d labels",
+        model_name,
+        device,
+        len(tokenized_train),
+        num_labels,
+    )
+
+    args = TrainingArguments(
+        output_dir=str(job_dir / "checkpoints"),
+        num_train_epochs=TRAIN_EPOCHS,
+        per_device_train_batch_size=TRAIN_BATCH_SIZE,
+        per_device_eval_batch_size=TRAIN_BATCH_SIZE,
+        learning_rate=TRAIN_LEARNING_RATE,
+        logging_dir=str(job_dir / "logs"),
+        logging_steps=10,
+        report_to="none",
+        save_strategy="no",  # the final model is saved explicitly below
+        # Progress bars write raw control codes into the captured worker log.
+        disable_tqdm=True,
+        fp16=device == "cuda",
+    )
+
+    deadline = time.monotonic() + MAX_TRAIN_SECONDS if MAX_TRAIN_SECONDS > 0 else None
+    budget = _build_budget_callback(deadline)
+
+    trainer = Trainer(
+        model=model,
+        args=args,
+        train_dataset=tokenized_train,
+        eval_dataset=tokenized_eval,
+        data_collator=data_collator,
+        compute_metrics=compute_metrics,
+        callbacks=[_build_callback(log_event, job_id), budget],
+    )
+
+    log_event({"stage": "training_started", "task": task, "model": model_name})
+    train_result = trainer.train()
+
+    if budget.exceeded:
+        # The model is still usable — it just saw fewer steps than planned —
+        # so finish the run and say so rather than discarding the work.
+        logger.warning("Job %s hit its %ds budget and stopped early.", job_id, MAX_TRAIN_SECONDS)
+        log_event(
+            {
+                "stage": "budget_reached",
+                "msg": (
+                    f"Stopped after {MAX_TRAIN_SECONDS}s, the time budget for one run. "
+                    "The model was saved with the steps it completed."
+                ),
+            }
+        )
+        update_job(job_id, error_msg=f"Training stopped at the {MAX_TRAIN_SECONDS}s budget.")
+
+    metrics: dict[str, float] = {
+        "train_loss": float(train_result.training_loss)
+        if train_result.training_loss is not None
+        else 0.0
+    }
+    if tokenized_eval is not None:
+        update_job(job_id, progress=96)
+        log_event({"stage": "evaluating"})
+        for key, value in trainer.evaluate().items():
+            if isinstance(value, (int, float)):
+                metrics[key] = float(value)
+
+    update_job(job_id, progress=98)
+    log_event({"stage": "saving", "path": str(job_dir)})
+    model.save_pretrained(str(job_dir))
+    tokenizer.save_pretrained(str(job_dir))
+    (job_dir / "metrics.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+
+    return metrics

@@ -178,13 +178,16 @@ export const VisionCube = () => {
             setHeatmapImage(null); // Reset
             try {
                 // 1. Predict
-                const res = await api.post('/cubes/run', {
-                    cube_id: 'vision',
-                    input: {
-                        action: 'predict',
-                        image: reader.result
+                const res = await api.post<VisionPrediction & { status?: string; message?: string }>(
+                    '/cubes/run',
+                    {
+                        cube_id: 'vision',
+                        input: {
+                            action: 'predict',
+                            image: reader.result
+                        }
                     }
-                });
+                );
                 if (res.data.status === 'success') {
                     setPrediction(res.data);
 
@@ -228,7 +231,7 @@ export const VisionCube = () => {
                 className="w-full h-full bg-card flex flex-col overflow-hidden"
             >
                 {/* Header */}
-                <div className="h-20 border-b border-border flex items-center justify-between px-8 bg-white/[0.02]">
+                <div className="h-20 border-b border-border flex items-center justify-between px-8 bg-card/[0.02]">
                     <div className="flex items-center gap-4">
                         <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center text-purple-400">
                             <Layers size={24} />
@@ -413,7 +416,7 @@ export const VisionCube = () => {
                                             }}
                                             className={`w-10 h-6 rounded-full p-1 transition-colors ${augConfig.flip ? 'bg-purple-500' : 'bg-muted'}`}
                                         >
-                                            <div className={`w-4 h-4 rounded-full bg-white shadow-sm transition-transform ${augConfig.flip ? 'translate-x-4' : 'translate-x-0'}`} />
+                                            <div className={`w-4 h-4 rounded-full bg-card shadow-sm transition-transform ${augConfig.flip ? 'translate-x-4' : 'translate-x-0'}`} />
                                         </button>
                                     </div>
                                 </div>
@@ -501,7 +504,7 @@ export const VisionCube = () => {
                                 </div>
                                 <button
                                     onClick={() => { setActiveTab('train'); handleTrain(); }}
-                                    className="px-8 py-4 bg-white text-black font-bold rounded-xl hover:scale-105 transition-transform flex items-center gap-2"
+                                    className="px-8 py-4 bg-card text-foreground font-bold rounded-xl hover:scale-105 transition-transform flex items-center gap-2"
                                 >
                                     <Play size={20} fill="currentColor" />
                                     Start Training
@@ -570,7 +573,7 @@ export const VisionCube = () => {
                                 {!isTraining && (
                                     <button
                                         onClick={() => setActiveTab('lab')}
-                                        className="mt-4 w-full py-3 bg-purple-600 hover:bg-purple-500 text-foreground rounded-xl font-bold transition-colors"
+                                        className="mt-4 w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold transition-colors"
                                     >
                                         Go to Lab
                                     </button>
@@ -616,7 +619,7 @@ export const VisionCube = () => {
                                         onClick={() => setShowHeatmap(!showHeatmap)}
                                         className={`w-14 h-8 rounded-full p-1 transition-colors ${showHeatmap ? 'bg-purple-500' : 'bg-muted'}`}
                                     >
-                                        <div className={`w-6 h-6 rounded-full bg-white shadow-sm transition-transform ${showHeatmap ? 'translate-x-6' : 'translate-x-0'}`} />
+                                        <div className={`w-6 h-6 rounded-full bg-card shadow-sm transition-transform ${showHeatmap ? 'translate-x-6' : 'translate-x-0'}`} />
                                     </button>
                                     <span className={`text-sm font-bold flex items-center gap-2 ${showHeatmap ? 'text-purple-400' : 'text-muted-foreground'}`}>
                                         <Zap size={14} /> X-Ray Vision

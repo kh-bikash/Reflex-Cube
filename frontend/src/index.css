@@ -1,42 +1,126 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Design tokens.
+ *
+ * A research-tool palette: near-neutral greys carrying the structure, one
+ * restrained blue for action and focus, and semantic colours reserved for
+ * state. Hue is spent on meaning, not decoration — a chart series or a failed
+ * job should be the most saturated thing on screen.
+ *
+ * Every token Tailwind references is defined here. The previous sheet omitted
+ * --border, --input, --ring and the chart colours, so `border-border` compiled
+ * to `hsl()` with an empty variable and silently fell back to the browser
+ * default on every bordered element.
+ */
+
 @layer base {
   :root {
-    --background: 0 0% 6%; /* Ultra clean dark grey/black */
-    --foreground: 0 0% 100%;
+    /* Surfaces, lightest to deepest */
+    --background: 0 0% 100%;
+    --surface: 220 20% 98%;
+    --foreground: 222 24% 11%;
 
-    --card: 0 0% 10%;
-    --card-foreground: 0 0% 100%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 24% 11%;
 
-    --popover: 0 0% 6%;
-    --popover-foreground: 0 0% 100%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 24% 11%;
 
-    --primary: 0 0% 98%; /* Pure white accents */
-    --primary-foreground: 0 0% 9%;
+    /* Action */
+    --primary: 221 70% 46%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 100%;
+    --secondary: 220 16% 95%;
+    --secondary-foreground: 222 24% 11%;
 
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 65%;
+    --muted: 220 16% 96%;
+    --muted-foreground: 220 9% 42%;
 
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 100%;
+    --accent: 220 16% 95%;
+    --accent-foreground: 222 24% 11%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    /* State */
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
 
-    --success: 142 76% 36%;
+    --success: 158 64% 32%;
     --success-foreground: 0 0% 100%;
 
-    --warning: 32 95% 44%;
+    --warning: 32 88% 42%;
     --warning-foreground: 0 0% 100%;
 
-    --radius: 1rem; /* The screenshots show heavily rounded corners on the massive hero image and cards */
+    --info: 221 70% 46%;
+    --info-foreground: 0 0% 100%;
+
+    /* Lines and focus */
+    --border: 220 15% 90%;
+    --input: 220 15% 88%;
+    --ring: 221 70% 46%;
+
+    /*
+     * Categorical series for charts. Ordered so neighbouring series stay
+     * distinguishable, and chosen to hold up in both themes and for the
+     * common colour-vision deficiencies.
+     */
+    --chart-1: 221 70% 46%;
+    --chart-2: 158 58% 36%;
+    --chart-3: 32 85% 48%;
+    --chart-4: 280 50% 52%;
+    --chart-5: 198 70% 42%;
+
+    /* Geometry. Small radii read as instrument, not consumer app. */
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 24% 8%;
+    --surface: 222 22% 11%;
+    --foreground: 220 14% 94%;
+
+    --card: 222 22% 11%;
+    --card-foreground: 220 14% 94%;
+
+    --popover: 222 22% 11%;
+    --popover-foreground: 220 14% 94%;
+
+    --primary: 217 85% 64%;
+    --primary-foreground: 222 30% 10%;
+
+    --secondary: 222 18% 16%;
+    --secondary-foreground: 220 14% 94%;
+
+    --muted: 222 18% 16%;
+    --muted-foreground: 220 10% 64%;
+
+    --accent: 222 18% 18%;
+    --accent-foreground: 220 14% 94%;
+
+    --destructive: 0 70% 58%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 158 54% 46%;
+    --success-foreground: 222 30% 10%;
+
+    --warning: 36 82% 56%;
+    --warning-foreground: 222 30% 10%;
+
+    --info: 217 85% 64%;
+    --info-foreground: 222 30% 10%;
+
+    --border: 222 16% 20%;
+    --input: 222 16% 22%;
+    --ring: 217 85% 64%;
+
+    --chart-1: 217 85% 64%;
+    --chart-2: 158 54% 50%;
+    --chart-3: 36 82% 60%;
+    --chart-4: 280 60% 68%;
+    --chart-5: 198 75% 58%;
   }
 }
 
@@ -45,39 +129,135 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
-    overflow-x: hidden;
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings:
+      "cv02",
+      "cv03",
+      "cv04",
+      "cv11";
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * Headings are tightened rather than enlarged. Display sizes get negative
+   * tracking because Inter's default spacing is tuned for body text and looks
+   * loose above about 32px.
+   */
   h1,
   h2,
   h3,
-  h4,
-  h5,
-  h6 {
-    font-family: 'Inter', sans-serif;
+  h4 {
+    @apply font-semibold tracking-tight text-foreground;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* A visible, consistent focus ring everywhere, for keyboard users. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  ::selection {
+    background-color: hsl(var(--primary) / 0.2);
+  }
+
+  /* Tabular figures keep metrics from jittering as they update. */
+  .tabular,
+  table,
+  time,
+  [data-metric] {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Lenis Scroll Smoothness */
-html.lenis,
-html.lenis body {
-  height: auto;
+@layer components {
+  /*
+   * Page shell. One measure for every route, so content lines up across the
+   * app instead of each page choosing its own.
+   */
+  .page {
+    @apply mx-auto w-full max-w-[1200px] px-6 lg:px-8;
+  }
+
+  .page-narrow {
+    @apply mx-auto w-full max-w-[720px] px-6;
+  }
+
+  /* An eyebrow above a section heading. */
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground;
+  }
+
+  /* Hairline separator that survives both themes. */
+  .rule {
+    @apply border-t border-border;
+  }
+
+  /*
+   * Status pill. The dot carries the colour so the label stays readable,
+   * and the state is never signalled by colour alone.
+   */
+  .status {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border bg-card
+           px-2.5 py-1 text-xs font-medium text-muted-foreground;
+  }
+
+  .status-dot {
+    @apply h-1.5 w-1.5 shrink-0 rounded-full;
+  }
 }
 
-.lenis.lenis-smooth {
-  scroll-behavior: auto !important;
-}
+@layer utilities {
+  /* Hide a scrollbar without disabling scrolling. */
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
 
-.lenis.lenis-smooth [data-lenis-prevent] {
-  overscroll-behavior: contain;
-}
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 
-.lenis.lenis-stopped {
-  overflow: hidden;
-}
+  /* Subtle, themed scrollbar for log and list panes. */
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
 
-.lenis.lenis-scrolling iframe {
-  pointer-events: none;
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }

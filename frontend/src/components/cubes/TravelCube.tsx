@@ -53,7 +53,7 @@ export default function TravelCube() {
     return (
         <div className="h-full w-full bg-card text-foreground p-8 overflow-y-auto font-sans relative">
             {/* Background Pattern */}
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none" />
+            <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 pointer-events-none" />
 
             <header className="relative z-10 max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center mb-12 border-b border-border pb-8">
                 <div className="flex items-center gap-4 mb-4 md:mb-0">
@@ -77,7 +77,7 @@ export default function TravelCube() {
                         />
                         <button
                             onClick={generateItinerary}
-                            className="bg-sky-500 hover:bg-sky-400 text-foreground px-6 py-2 rounded-xl font-bold transition-transform active:scale-95"
+                            className="bg-sky-500 hover:bg-sky-400 text-white px-6 py-2 rounded-xl font-bold transition-transform active:scale-95"
                         >
                             Fly
                         </button>
@@ -87,7 +87,6 @@ export default function TravelCube() {
 
             {loading && (
                 <div className="flex flex-col items-center justify-center h-[50vh]">
-                    {/* @ts-expect-error: Motion component types compatibility */}
                     <motion.div
                         animate={{ y: [0, -20, 0] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -100,7 +99,6 @@ export default function TravelCube() {
             )}
 
             {result && !loading && (
-                // @ts-expect-error: Motion component types compatibility
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto">
                     {/* Destination Hero */}
                     <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-sky-900 to-indigo-900 p-8 md:p-12 mb-8 border border-border">
@@ -123,7 +121,6 @@ export default function TravelCube() {
                     {/* Itinerary Grid */}
                     <div className="grid md:grid-cols-3 gap-6 mb-8">
                         {result.days.map((day, i) => (
-                            // @ts-expect-error: Motion component types compatibility
                             <motion.div
                                 key={day.day}
                                 initial={{ opacity: 0, y: 20 }}

@@ -95,7 +95,7 @@ export const NexusCube = () => {
                             className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                             <div className={`max-w-[80%] rounded-2xl p-4 border ${msg.role === 'user'
-                                    ? 'bg-indigo-600 text-foreground border-indigo-500'
+                                    ? 'bg-indigo-600 text-white border-indigo-500'
                                     : 'bg-muted/50 text-foreground/90 border-border'
                                 }`}>
                                 <div className="flex items-center gap-2 mb-1 text-xs font-bold opacity-50 uppercase tracking-wider">
@@ -135,7 +135,7 @@ export const NexusCube = () => {
                         <button
                             onClick={handleSend}
                             disabled={loading || !input.trim()}
-                            className="absolute right-2 top-2 p-2 bg-indigo-600 hover:bg-indigo-500 text-foreground rounded-lg transition-colors disabled:opacity-50 disabled:bg-transparent"
+                            className="absolute right-2 top-2 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors disabled:opacity-50 disabled:bg-transparent"
                         >
                             <Send size={20} />
                         </button>

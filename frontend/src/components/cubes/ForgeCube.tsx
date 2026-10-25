@@ -18,7 +18,7 @@ export default function ForgeCube() {
     const [generatedText, setGeneratedText] = useState("");
     const [prompt, setPrompt] = useState("The");
     const [saveName, setSaveName] = useState("");
-    const [models, setModels] = useState<Array<{ name: string; date?: string; size?: string }>>([]);
+    const [models, setModels] = useState<Array<{ name: string; date?: string; size: number }>>([]);
     const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai', content: string }[]>([]);
     const [chatInput, setChatInput] = useState("");
 
@@ -250,17 +250,17 @@ export default function ForgeCube() {
                     <h2 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-red-600">
                         Forge Cube
                     </h2>
-                    <p className="text-slate-400">Architect and Train LLMs from Scratch.</p>
+                    <p className="text-muted-foreground">Architect and Train LLMs from Scratch.</p>
                 </div>
 
                 {/* Status Pill */}
-                <div className={`px-4 py-2 rounded-full border ${isTraining ? 'border-green-500/50 bg-green-500/10 text-success animate-pulse' : 'border-slate-700 bg-slate-800'}`}>
+                <div className={`px-4 py-2 rounded-full border ${isTraining ? 'border-green-500/50 bg-green-500/10 text-success animate-pulse' : 'border-border bg-card'}`}>
                     {isTraining ? `Training | Step ${stats.step} | Loss ${stats.loss.toFixed(4)}` : 'Ready / Idle'}
                 </div>
             </div>
 
             {/* Tabs */}
-            <div className="flex space-x-2 mb-6 border-b border-slate-700 pb-2 overflow-x-auto">
+            <div className="flex space-x-2 mb-6 border-b border-border pb-2 overflow-x-auto">
                 {[
                     { id: 'data', icon: Database, label: '1. Dataset' },
                     { id: 'arch', icon: Cpu, label: '2. Architecture' },
@@ -272,8 +272,8 @@ export default function ForgeCube() {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id as 'data' | 'arch' | 'train' | 'play' | 'models')}
                         className={`flex items-center space-x-2 px-4 py-2 rounded-t-lg transition-all ${activeTab === tab.id
-                            ? 'bg-slate-800 text-orange-400 border-b-2 border-orange-400'
-                            : 'text-slate-400 hover:text-foreground hover:bg-slate-800/50'
+                            ? 'bg-card text-orange-400 border-b-2 border-orange-400'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-card/50'
                             }`}
                     >
                         <tab.icon size={16} />
@@ -283,18 +283,18 @@ export default function ForgeCube() {
             </div>
 
             {/* Content Area */}
-            <div className="flex-1 bg-slate-950/50 rounded-xl border border-slate-800 p-6 overflow-y-auto">
+            <div className="flex-1 bg-background/50 rounded-xl border border-border p-6 overflow-y-auto">
                 <AnimatePresence mode="wait">
 
                     {/* DATA TAB */}
                     {activeTab === 'data' && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full flex flex-col">
                             <div className="flex justify-between items-center mb-4">
-                                <h3 className="text-lg font-medium text-slate-300">Training Data</h3>
+                                <h3 className="text-lg font-medium text-foreground">Training Data</h3>
                                 <div className="flex gap-2">
                                     <button
                                         onClick={handleLoadShakespeare}
-                                        className="flex items-center space-x-2 px-3 py-1 bg-slate-800 hover:bg-slate-700 rounded text-xs text-slate-300 border border-slate-700 transition-colors"
+                                        className="flex items-center space-x-2 px-3 py-1 bg-card hover:bg-muted rounded text-xs text-foreground border border-border transition-colors"
                                     >
                                         <BookOpen size={14} />
                                         <span>Load Shakespeare</span>
@@ -316,13 +316,13 @@ export default function ForgeCube() {
                                 </div>
                             </div>
                             <textarea
-                                className="flex-1 bg-background border border-slate-700 rounded-lg p-4 font-mono text-sm focus:border-orange-500 outline-none resize-none"
+                                className="flex-1 bg-background border border-border rounded-lg p-4 font-mono text-sm focus:border-orange-500 outline-none resize-none"
                                 placeholder="Paste your raw text here (e.g. Shakespeare, Code, Lyrics)..."
                                 value={dataText}
                                 onChange={(e) => setDataText(e.target.value)}
                             />
                             <div className="mt-4 flex justify-end">
-                                <button onClick={handleUpload} className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-foreground rounded-lg font-medium transition-colors">
+                                <button onClick={handleUpload} className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors">
                                     Map to Tokenizer &rarr;
                                 </button>
                             </div>
@@ -332,60 +332,60 @@ export default function ForgeCube() {
                     {/* ARCHITECTURE TAB */}
                     {activeTab === 'arch' && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full flex flex-col max-w-2xl mx-auto">
-                            <h3 className="text-lg font-medium mb-6 text-slate-300">Model Configuration</h3>
+                            <h3 className="text-lg font-medium mb-6 text-foreground">Model Configuration</h3>
 
                             <div className="space-y-8">
                                 {/* Layers */}
                                 <div>
                                     <div className="flex justify-between mb-2">
-                                        <label className="text-slate-400">Transformer Layers (Depth)</label>
+                                        <label className="text-muted-foreground">Transformer Layers (Depth)</label>
                                         <span className="text-orange-400 font-mono">{config.n_layer}</span>
                                     </div>
                                     <input
                                         type="range" min="1" max="12" step="1"
                                         value={config.n_layer}
                                         onChange={(e) => setConfig({ ...config, n_layer: parseInt(e.target.value) })}
-                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                                        className="w-full h-2 bg-card rounded-lg appearance-none cursor-pointer accent-orange-500"
                                     />
                                 </div>
 
                                 {/* Heads */}
                                 <div>
                                     <div className="flex justify-between mb-2">
-                                        <label className="text-slate-400">Attention Heads</label>
+                                        <label className="text-muted-foreground">Attention Heads</label>
                                         <span className="text-orange-400 font-mono">{config.n_head}</span>
                                     </div>
                                     <input
                                         type="range" min="1" max="12" step="1"
                                         value={config.n_head}
                                         onChange={(e) => setConfig({ ...config, n_head: parseInt(e.target.value) })}
-                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                                        className="w-full h-2 bg-card rounded-lg appearance-none cursor-pointer accent-orange-500"
                                     />
                                 </div>
 
                                 {/* Embedding Dim */}
                                 <div>
                                     <div className="flex justify-between mb-2">
-                                        <label className="text-slate-400">Embedding Dimension (Width)</label>
+                                        <label className="text-muted-foreground">Embedding Dimension (Width)</label>
                                         <span className="text-orange-400 font-mono">{config.n_embd}</span>
                                     </div>
                                     <input
                                         type="range" min="32" max="512" step="16"
                                         value={config.n_embd}
                                         onChange={(e) => setConfig({ ...config, n_embd: parseInt(e.target.value) })}
-                                        className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-orange-500"
+                                        className="w-full h-2 bg-card rounded-lg appearance-none cursor-pointer accent-orange-500"
                                     />
                                 </div>
 
-                                <div className="p-4 bg-background rounded-lg border border-slate-800 mt-8">
-                                    <h4 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Estimated Params</h4>
+                                <div className="p-4 bg-background rounded-lg border border-border mt-8">
+                                    <h4 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">Estimated Params</h4>
                                     <p className="text-2xl font-mono text-foreground">
                                         {((12 * config.n_layer * Math.pow(config.n_embd, 2)) / 1000000).toFixed(2)} M
                                     </p>
                                 </div>
 
                                 <div className="mt-8 flex justify-end">
-                                    <button onClick={() => setActiveTab('train')} className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-foreground rounded-lg font-medium transition-colors">
+                                    <button onClick={() => setActiveTab('train')} className="px-6 py-2 bg-orange-600 hover:bg-orange-500 text-white rounded-lg font-medium transition-colors">
                                         Go to Terminal &rarr;
                                     </button>
                                 </div>
@@ -398,7 +398,7 @@ export default function ForgeCube() {
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full flex flex-col gap-6">
 
                             {/* Graph Area */}
-                            <div className="h-64 bg-background/50 rounded-lg border border-slate-800 p-4 relative overflow-hidden flex items-end gap-1">
+                            <div className="h-64 bg-background/50 rounded-lg border border-border p-4 relative overflow-hidden flex items-end gap-1">
                                 {lossHistory.length > 0 ? (
                                     lossHistory.map((pt, i) => (
                                         <div
@@ -409,14 +409,14 @@ export default function ForgeCube() {
                                         />
                                     ))
                                 ) : (
-                                    <div className="absolute inset-0 flex items-center justify-center text-slate-500">
+                                    <div className="absolute inset-0 flex items-center justify-center text-muted-foreground">
                                         Waiting to start...
                                     </div>
                                 )}
                                 {/* Grid lines */}
-                                <div className="absolute inset-0 pointer-events-none border-t border-slate-800/30" style={{ top: '25%' }} />
-                                <div className="absolute inset-0 pointer-events-none border-t border-slate-800/30" style={{ top: '50%' }} />
-                                <div className="absolute inset-0 pointer-events-none border-t border-slate-800/30" style={{ top: '75%' }} />
+                                <div className="absolute inset-0 pointer-events-none border-t border-border/30" style={{ top: '25%' }} />
+                                <div className="absolute inset-0 pointer-events-none border-t border-border/30" style={{ top: '50%' }} />
+                                <div className="absolute inset-0 pointer-events-none border-t border-border/30" style={{ top: '75%' }} />
                             </div>
 
                             {/* Controls & Logs */}
@@ -428,41 +428,41 @@ export default function ForgeCube() {
                                             {log}
                                         </div>
                                     ))}
-                                    {logs.length === 0 && <span className="text-slate-600">// System ready. Waiting for command...</span>}
+                                    {logs.length === 0 && <span className="text-muted-foreground">// System ready. Waiting for command...</span>}
                                 </div>
 
                                 {/* Control Panel */}
                                 <div className="w-48 flex flex-col gap-3">
                                     {!isTraining ? (
-                                        <button onClick={startTraining} className="flex items-center justify-center space-x-2 py-4 bg-green-600 hover:bg-green-500 text-foreground rounded-lg font-bold transition-all shadow-lg shadow-green-900/20">
+                                        <button onClick={startTraining} className="flex items-center justify-center space-x-2 py-4 bg-green-600 hover:bg-green-500 text-white rounded-lg font-bold transition-all shadow-lg shadow-green-900/20">
                                             <Play size={20} />
                                             <span>START RUN</span>
                                         </button>
                                     ) : (
-                                        <button onClick={stopTraining} className="flex items-center justify-center space-x-2 py-4 bg-red-600 hover:bg-red-500 text-foreground rounded-lg font-bold transition-all shadow-lg">
+                                        <button onClick={stopTraining} className="flex items-center justify-center space-x-2 py-4 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold transition-all shadow-lg">
                                             <Square size={20} />
                                             <span>ABORT</span>
                                         </button>
                                     )}
 
                                     {/* Save Checkpoint */}
-                                    <div className="mt-4 pt-4 border-t border-slate-800 flex flex-col gap-2">
-                                        <label className="text-xs text-slate-400 font-bold uppercase">Save Checkpoint</label>
+                                    <div className="mt-4 pt-4 border-t border-border flex flex-col gap-2">
+                                        <label className="text-xs text-muted-foreground font-bold uppercase">Save Checkpoint</label>
                                         <div className="flex gap-1">
                                             <input
-                                                className="w-full bg-background border border-slate-700 rounded px-2 py-1 text-xs"
+                                                className="w-full bg-background border border-border rounded px-2 py-1 text-xs"
                                                 placeholder="Model Name"
                                                 value={saveName}
                                                 onChange={(e) => setSaveName(e.target.value)}
                                             />
-                                            <button onClick={saveModel} className="bg-blue-600 hover:bg-blue-500 text-foreground p-1 rounded">
+                                            <button onClick={saveModel} className="bg-blue-600 hover:bg-blue-500 text-white p-1 rounded">
                                                 <Save size={16} />
                                             </button>
                                         </div>
                                     </div>
 
                                     <div className="mt-auto">
-                                        <button onClick={() => setActiveTab('play')} className="w-full py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded mb-2 text-sm">
+                                        <button onClick={() => setActiveTab('play')} className="w-full py-2 bg-card hover:bg-muted text-foreground rounded mb-2 text-sm">
                                             Open Playground
                                         </button>
                                     </div>
@@ -474,14 +474,14 @@ export default function ForgeCube() {
                     {/* MODELS TAB */}
                     {activeTab === 'models' && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full flex flex-col pt-10 px-20">
-                            <h3 className="text-xl font-medium mb-6 text-center text-slate-300">Saved Models</h3>
+                            <h3 className="text-xl font-medium mb-6 text-center text-foreground">Saved Models</h3>
 
-                            <div className="bg-background border border-slate-800 rounded-xl overflow-hidden">
+                            <div className="bg-background border border-border rounded-xl overflow-hidden">
                                 {models.length === 0 ? (
-                                    <div className="p-8 text-center text-slate-500 italic">No saved models found. Train one first!</div>
+                                    <div className="p-8 text-center text-muted-foreground italic">No saved models found. Train one first!</div>
                                 ) : (
-                                    <table className="w-full text-left text-sm text-slate-400">
-                                        <thead className="bg-slate-950 text-slate-200">
+                                    <table className="w-full text-left text-sm text-muted-foreground">
+                                        <thead className="bg-background text-foreground">
                                             <tr>
                                                 <th className="p-4">Name</th>
                                                 <th className="p-4">Size (MB)</th>
@@ -490,7 +490,7 @@ export default function ForgeCube() {
                                         </thead>
                                         <tbody>
                                             {models.map((m, i) => (
-                                                <tr key={i} className="border-t border-slate-800 hover:bg-slate-800/50 transition-colors">
+                                                <tr key={i} className="border-t border-border hover:bg-card/50 transition-colors">
                                                     <td className="p-4 font-mono text-foreground flex items-center gap-2">
                                                         <FolderOpen size={16} className="text-orange-500" />
                                                         {m.name}
@@ -499,7 +499,7 @@ export default function ForgeCube() {
                                                     <td className="p-4 text-right">
                                                         <button
                                                             onClick={() => loadModel(m.name)}
-                                                            className="px-3 py-1 bg-green-600/20 text-success hover:bg-green-600 hover:text-foreground rounded border border-green-600/50 transition-colors text-xs font-bold"
+                                                            className="px-3 py-1 bg-green-600/20 text-success hover:bg-green-600 hover:text-white rounded border border-green-600/50 transition-colors text-xs font-bold"
                                                         >
                                                             LOAD
                                                         </button>
@@ -518,9 +518,9 @@ export default function ForgeCube() {
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="h-full flex flex-col max-w-3xl mx-auto pt-4 pb-4">
 
                             {/* Chat Window */}
-                            <div className="flex-1 bg-background/50 border border-slate-800 rounded-xl mb-4 overflow-y-auto p-4 flex flex-col gap-4">
+                            <div className="flex-1 bg-background/50 border border-border rounded-xl mb-4 overflow-y-auto p-4 flex flex-col gap-4">
                                 {chatHistory.length === 0 && (
-                                    <div className="flex flex-col items-center justify-center h-full text-slate-600 opacity-50">
+                                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground opacity-50">
                                         <Bot size={48} className="mb-4" />
                                         <p>Send a message to start chatting.</p>
                                     </div>
@@ -529,8 +529,8 @@ export default function ForgeCube() {
                                 {chatHistory.map((msg, i) => (
                                     <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                         <div className={`max-w-[80%] rounded-2xl px-4 py-3 flex gap-3 ${msg.role === 'user'
-                                            ? 'bg-blue-600 text-foreground rounded-br-none'
-                                            : 'bg-slate-800 text-slate-200 rounded-bl-none'
+                                            ? 'bg-blue-600 text-white rounded-br-none'
+                                            : 'bg-card text-foreground rounded-bl-none'
                                             }`}>
                                             <div className="mt-1 opacity-70">
                                                 {msg.role === 'user' ? <User size={16} /> : <Bot size={16} />}
@@ -542,7 +542,7 @@ export default function ForgeCube() {
                             </div>
 
                             {/* Input Area */}
-                            <div className="flex gap-2 bg-background p-2 rounded-xl border border-slate-700 focus-within:border-blue-500 transition-colors">
+                            <div className="flex gap-2 bg-background p-2 rounded-xl border border-border focus-within:border-blue-500 transition-colors">
                                 <input
                                     className="flex-1 bg-transparent border-none outline-none px-4 text-foreground"
                                     placeholder="Message your AI..."
@@ -553,7 +553,7 @@ export default function ForgeCube() {
                                 <button
                                     onClick={handleChatSubmit}
                                     disabled={!chatInput.trim() || isTraining}
-                                    className="p-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-foreground disabled:opacity-50 disabled:grayscale transition-all"
+                                    className="p-3 bg-blue-600 hover:bg-blue-500 rounded-lg text-white disabled:opacity-50 disabled:grayscale transition-all"
                                 >
                                     <Send size={18} />
                                 </button>

@@ -1,10 +1,11 @@
 {
-  "root": ".",
   "pythonVersion": "3.10",
+  "include": ["app", "scripts", "tests", "train_worker.py"],
+  "exclude": ["**/__pycache__", ".venv", "venv"],
   "extraPaths": ["."],
-  "reportMissingImports": "warning",
-  "reportMissingModuleSource": "none",
   "venvPath": ".",
-  "include": ["app"],
-  "exclude": ["**/__pycache__"]
+  "venv": ".venv",
+  "typeCheckingMode": "basic",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "none"
 }

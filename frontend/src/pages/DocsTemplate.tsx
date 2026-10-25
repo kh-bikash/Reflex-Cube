@@ -91,22 +91,21 @@ export default function DocsTemplate() {
                                 <>
                                     <h2 className="text-3xl font-bold mb-6 mt-12 border-b border-white/10 pb-4">Introduction</h2>
                                     <p className="mb-6 leading-relaxed">
-                                        ReflexCube provides a robust, low-latency API designed for executing autonomous agent tasks directly against your locally trained or cloud-deployed models. This documentation covers everything from authentication to managing your bento infrastructure.
+                                        Reflex Cube exposes one API for queueing prompt-to-model training jobs, streaming their progress, and dispatching to the Intelligence Cubes. An interactive reference generated from the code is served at <code>/docs</code> on the running backend.
                                     </p>
 
                                     <div className="my-10 bg-[#050505] border border-white/10 rounded-2xl p-6 relative group">
                                         <div className="absolute top-4 right-4 text-xs font-mono text-white/40">BASH</div>
                                         <pre className="font-mono text-sm text-white/80 overflow-x-auto whitespace-pre">
-                                            <span className="text-green-400">curl</span> -X POST https://api.reflexcube.com/v1/models/train \<br/>
-                                            {"  "}-H <span className="text-yellow-300">"Authorization: Bearer YOUR_API_KEY"</span> \<br/>
+                                            <span className="text-green-400">curl</span> -X POST http://localhost:8000/api/models/create \<br/>
                                             {"  "}-H <span className="text-yellow-300">"Content-Type: application/json"</span> \<br/>
-                                            {"  "}-d <span className="text-blue-300">'{"{"} "model": "nexus-v2", "dataset": "s3://..." {"}"}'</span>
+                                            {"  "}-d <span className="text-blue-300">'{"{"} "name": "review-sentiment", "prompt": "classify movie reviews" {"}"}'</span>
                                         </pre>
                                     </div>
 
                                     <h2 className="text-3xl font-bold mb-6 mt-12 border-b border-white/10 pb-4">Rate Limits</h2>
                                     <p className="mb-6 leading-relaxed">
-                                        Standard API requests are limited to 100 requests per second per IP address. If you exceed this limit, you will receive a <code>429 Too Many Requests</code> response. Enterprise customers have custom rate limits configurable in their dashboard.
+                                        The API ships without authentication or rate limiting — every endpoint is open to whoever can reach the port. Put it behind your own auth layer and rate-limit <code>POST /api/models/create</code> before exposing it, since each call spawns a training process.
                                     </p>
                                 </>
                             ) : rawPath === 'changelog' ? (

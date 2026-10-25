@@ -1,20 +1,38 @@
-fastapi==0.101.1
-uvicorn[standard]==0.22.0
-SQLAlchemy==2.0.44
-pydantic==1.10.12
-transformers==4.40.0
-datasets==2.12.0
-pyarrow==11.0.0
-numpy==1.25.2
-aiofiles==23.1.0
-python-multipart==0.0.6
-typing_extensions==4.8.0
-requests==2.31.0
-pandas==2.1.4
-apify-client==1.6.2
-e2b_code_interpreter==1.0.3
-python-dotenv==1.0.1
-bitsandbytes==0.43.1
-accelerate==0.30.0
-turbovec==0.7.0
-sentence-transformers==2.7.0
+# Core API runtime.
+#
+# This is everything the HTTP server itself needs: it starts, serves the cube
+# catalog, tracks jobs and streams logs with only these installed. Cubes that
+# need a heavier stack report themselves as unavailable rather than crashing.
+#
+#   pip install -r requirements.txt       # API only (fast)
+#   pip install -r requirements-ml.txt    # + training and the ML-backed cubes
+#   pip install -r requirements-dev.txt   # + test and lint tooling
+#
+# Versions are floors with a major-version cap: tight enough to be reproducible,
+# loose enough to pick up security patches.
+
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30,<1.0
+SQLAlchemy>=2.0,<3.0
+pydantic>=2.7,<3.0
+pydantic[email]>=2.7,<3.0
+python-multipart>=0.0.9,<0.1
+python-dotenv>=1.0,<2.0
+requests>=2.31,<3.0
+aiofiles>=23.1,<25.0
+
+# Accounts: password hashing and session tokens
+bcrypt>=4.1,<6.0
+PyJWT>=2.8,<3.0
+
+# Hosted Postgres. A SQLite file on a hosted container's ephemeral disk is
+# lost on every restart, so any real deployment needs this.
+psycopg[binary]>=3.1,<4.0
+
+# Pushes finished models to the Hub so they outlive the container that trained
+# them. Small and pure-python; the heavy ML stack is a separate file.
+huggingface-hub>=0.23,<1.0
+
+# Markdown -> PDF export (POST /api/cubes/pdf)
+Markdown>=3.5,<4.0
+xhtml2pdf>=0.2.15,<0.3

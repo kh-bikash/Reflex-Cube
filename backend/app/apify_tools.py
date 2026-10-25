@@ -1,60 +1,91 @@
-import os
-from apify_client import ApifyClient
-from dotenv import load_dotenv
+"""Thin wrappers over the Apify actors the research-style cubes use.
 
-load_dotenv()
+The client is built lazily. Importing this module used to raise when
+`APIFY_API_TOKEN` was unset, which took down anything that merely imported it
+— including the cube registry — on a machine without scraping credentials.
+"""
 
-APIFY_TOKEN = os.getenv("APIFY_API_TOKEN")
-if not APIFY_TOKEN:
-    raise ValueError("APIFY_API_TOKEN is not set in environment variables.")
+from __future__ import annotations
 
-client = ApifyClient(APIFY_TOKEN)
+from typing import Any
 
-def scrape_webpage(url: str):
-    """
-    Scrapes the text content of a webpage using the Web Scraper Actor.
-    """
-    run_input = {
-        "startUrls": [{"url": url}],
-        "useChrome": False,
-        "pageFunction": "async () => { return { title: document.title, text: document.body.innerText }; }"
-    }
-    
-    run = client.actor("apify/web-scraper").call(run_input=run_input)
-    
-    results = []
-    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-        results.append(item)
-    return results
+from .config import APIFY_API_TOKEN
+from .logging_config import get_logger
 
-def search_google(query: str, max_items: int = 5):
-    """
-    Performs a Google search and returns the top results.
-    """
-    run_input = {
-        "queries": query,
-        "resultsPerPage": max_items,
-    }
-    
-    run = client.actor("apify/google-search-scraper").call(run_input=run_input)
-    
-    results = []
-    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-        results.append(item)
-    return results
+logger = get_logger(__name__)
 
-def scrape_instagram_profile(username: str, max_items: int = 10):
+_client = None
+
+
+class ApifyNotConfigured(RuntimeError):
+    """Raised when an Apify call is made without a usable client."""
+
+
+def is_configured() -> bool:
+    """True if a token is present, without building the client."""
+    return bool(APIFY_API_TOKEN)
+
+
+def get_client():
+    """Return a cached `ApifyClient`.
+
+    Raises:
+        ApifyNotConfigured: if the token is missing or the SDK is not installed.
     """
-    Scrapes an Instagram profile and its recent posts using an Apify Actor.
-    """
-    run_input = {
-        "username": [username],
-        "resultsLimit": max_items,
-    }
-    
-    run = client.actor("apify/instagram-profile-scraper").call(run_input=run_input)
-    
-    results = []
-    for item in client.dataset(run["defaultDatasetId"]).iterate_items():
-        results.append(item)
-    return results
+    global _client
+    if _client is not None:
+        return _client
+
+    if not APIFY_API_TOKEN:
+        raise ApifyNotConfigured("APIFY_API_TOKEN is not set; web scraping tools are unavailable.")
+    try:
+        from apify_client import ApifyClient
+    except ImportError as exc:  # pragma: no cover - requires the extra
+        raise ApifyNotConfigured("The apify-client package is not installed.") from exc
+
+    _client = ApifyClient(APIFY_API_TOKEN)
+    return _client
+
+
+def _collect(run: dict[str, Any]) -> list[dict[str, Any]]:
+    """Drain an actor run's default dataset."""
+    client = get_client()
+    return list(client.dataset(run["defaultDatasetId"]).iterate_items())
+
+
+def scrape_webpage(url: str) -> list[dict[str, Any]]:
+    """Return the title and visible text of a page."""
+    run = (
+        get_client()
+        .actor("apify/web-scraper")
+        .call(
+            run_input={
+                "startUrls": [{"url": url}],
+                "useChrome": False,
+                "pageFunction": (
+                    "async () => ({ title: document.title, text: document.body.innerText })"
+                ),
+            }
+        )
+    )
+    return _collect(run)
+
+
+def search_google(query: str, max_items: int = 5) -> list[dict[str, Any]]:
+    """Return the top organic results for a query."""
+    run = (
+        get_client()
+        .actor("apify/google-search-scraper")
+        .call(run_input={"queries": query, "resultsPerPage": max_items})
+    )
+    return _collect(run)
+
+
+def scrape_instagram_profile(username: str, max_items: int = 10) -> list[dict[str, Any]]:
+    """Return a public Instagram profile and its recent posts."""
+    run = (
+        get_client()
+        .actor("apify/instagram-profile-scraper")
+        .call(run_input={"username": [username], "resultsLimit": max_items})
+    )
+    return _collect(run)

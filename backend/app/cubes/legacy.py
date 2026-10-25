@@ -1,8 +1,7 @@
-from typing import Dict, Any, List
+from typing import Any
+
 from .base import Cube
-import requests
-import json
-import re
+
 
 class LegacyCube(Cube):
     @property
@@ -13,10 +12,10 @@ class LegacyCube(Cube):
     def description(self) -> str:
         return "The Modernizer. Converts legacy code to modern paradigms."
 
-    def run(self, input_data: Any) -> Dict[str, Any]:
+    def run(self, input_data: Any) -> dict[str, Any]:
         source_code = input_data.get("source_code", "")
         target_lang = input_data.get("target_lang", "Python 3")
-        
+
         if not source_code:
             return {"status": "error", "message": "No source code provided"}
 
@@ -35,43 +34,39 @@ RULES:
 LEGACY CODE:
 {source_code}
 """
-        
+
         # Call AI API using centralized router specifically requesting the code engine
-        from ..utils.ai_router import query_ai, extract_json
+        from ..utils.ai_router import extract_json, query_ai
+
         try:
             ai_text = query_ai(
                 system_prompt="You are a code modernization engine. Output valid JSON only.",
                 user_prompt=prompt,
-                engine_type="code"
+                engine_type="code",
             )
-            
-            print(f"[Legacy Cube] Raw AI: {ai_text[:100]}...") # Debug log
-            
+
+            print(f"[Legacy Cube] Raw AI: {ai_text[:100]}...")  # Debug log
+
             data = extract_json(ai_text)
             if data:
-                return {
-                    "status": "success",
-                    "data": data
-                }
+                return {"status": "success", "data": data}
             else:
                 print(f"JSON Parse Error. Raw: {ai_text}")
                 return {
                     "status": "success",
                     "data": {
                         "modern_code": ai_text,
-                        "explanation": "AI generated code but returned invalid JSON structure. See code pane."
-                    }
+                        "explanation": "AI generated code but returned invalid JSON structure. See code pane.",
+                    },
                 }
-                    
+
         except Exception as e:
             print(f"AI Error: {e}")
             # Fallback Mock if AI fails
             return {
                 "status": "success",
                 "data": {
-                    "modern_code": f"# AI Service Unavailable. Mock Conversion:\n\ndef modern_version():\n    pass # Failed to connect to engine",
-                    "explanation": "Service timeout. Showing mock result."
-                }
+                    "modern_code": "# AI Service Unavailable. Mock Conversion:\n\ndef modern_version():\n    pass # Failed to connect to engine",
+                    "explanation": "Service timeout. Showing mock result.",
+                },
             }
-
-

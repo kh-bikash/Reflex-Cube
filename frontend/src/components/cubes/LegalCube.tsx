@@ -126,7 +126,7 @@ export default function LegalCube() {
                             <Upload className="w-16 h-16 text-foreground/20 mb-6" />
                             <p className="text-xl font-semibold mb-2">Drop your Contract PDF here</p>
                             <p className="text-muted-foreground mb-6">or click to browse</p>
-                            <span className="bg-white text-black px-6 py-2 rounded-full font-medium hover:bg-blue-50 transition-colors">Select File</span>
+                            <span className="bg-card text-foreground px-6 py-2 rounded-full font-medium hover:bg-blue-50 transition-colors">Select File</span>
                         </label>
                     ) : (
                         <div className="flex flex-col items-center">
@@ -134,7 +134,7 @@ export default function LegalCube() {
                             <p className="text-xl font-medium mb-6">{file.name}</p>
                             <div className="flex gap-4">
                                 <button onClick={() => setFile(null)} className="px-6 py-2 rounded-full border border-border hover:bg-muted">Change</button>
-                                <button onClick={analyzeContract} className="px-8 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-foreground font-medium shadow-lg shadow-blue-600/20">Analyze Risks</button>
+                                <button onClick={analyzeContract} className="px-8 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-medium shadow-lg shadow-blue-600/20">Analyze Risks</button>
                             </div>
                         </div>
                     )}

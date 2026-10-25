@@ -1,49 +1,68 @@
-# Python
+# ---- Python ----
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
-*.sqlite3
+*.py[cod]
+*.egg-info/
+.eggs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
 
-# Virtual environment
+# Virtual environments
 venv/
-backend/venv/
-env/
 .venv/
+env/
+backend/venv/
+backend/.venv/
 
-# Node modules
+# ---- Node ----
 node_modules/
+.npm/
+# Vite writes these next to the config when it transpiles it
+vite.config.ts.timestamp-*
+vite.config.js.timestamp-*
 
-# Build directories
+# ---- Builds ----
 dist/
+dist-ssr/
 build/
+*.local
 
-# Environment files
+# ---- Environment ----
 .env
-.env.local
+.env.*
+!.env.example
 
-# VSCode
+# ---- Editors / OS ----
 .vscode/
-
-# macOS / Windows junk
+.idea/
 .DS_Store
 Thumbs.db
+*.swp
 
-# Storage and model artifacts (avoid committing large models)
-/storage/
+# ---- Databases ----
+*.db
+*.sqlite
+*.sqlite3
+
+# ---- Runtime artifacts ----
+# Trained checkpoints, job logs and scratch output produced at runtime.
+# `storage/` keeps a committed .gitkeep so the volume mount point exists.
+storage/*
+!storage/.gitkeep
+backend/storage/*
+!backend/storage/.gitkeep
 *.safetensors
 *.ckpt
 *.pt
-*.model
 *.h5
+*.onnx
+*.tvim
+nexus_db.json
 
-# Logs and debug outputs
+# ---- Logs ----
 *.log
-
-# Local environment files
-.env.local
-.env.*.local
-
-# Node lock / build artifacts
-package-lock.json
+logs/

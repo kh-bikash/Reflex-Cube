@@ -1,0 +1,70 @@
+name: Deploy backend to Hugging Face Spaces
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "deploy/huggingface/**"
+      - ".github/workflows/deploy-space.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-space
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Push to the Space
+    runs-on: ubuntu-latest
+    # Skipped on forks and on repos that have not configured the secrets.
+    if: github.repository_owner != '' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check configuration
+        id: config
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+        run: |
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE_ID" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Set the HF_TOKEN secret and the HF_SPACE_ID variable" \
+                 "(e.g. your-name/reflex-cube-api) to enable Space deploys."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Assemble the Space
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p space
+          # The Space builds from backend/, with the Space card as its README.
+          # Both come from this repo, so the Space never drifts from main.
+          cp -r backend/. space/
+          cp deploy/huggingface/README.md space/README.md
+          rm -rf space/.venv space/tests space/.pytest_cache space/.ruff_cache
+          rm -f space/.coverage space/reflex.db
+          ls -la space
+
+      - name: Push
+        if: steps.config.outputs.configured == 'true'
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE_ID: ${{ vars.HF_SPACE_ID }}
+        run: |
+          set -euo pipefail
+          cd space
+          git init -q
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Deploy ${GITHUB_SHA::8} from ${GITHUB_REPOSITORY}"
+          # Spaces only accept a force push from a fresh tree; the Space's
+          # history is a mirror of this repo's, not a source of truth.
+          git push --force \
+            "https://oauth:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE_ID}" \
+            HEAD:main
+          echo "::notice::Deployed to https://huggingface.co/spaces/${HF_SPACE_ID}"

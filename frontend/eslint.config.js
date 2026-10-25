@@ -24,7 +24,9 @@ export default tseslint.config(
     },
   },
   {
-    files: ["src/components/ui/**/*.{ts,tsx}"],
+    // Design-system primitives and context modules export hooks and helpers
+    // alongside components by design; fast refresh is not a concern there.
+    files: ["src/components/ui/**/*.{ts,tsx}", "src/lib/**/*.{ts,tsx}"],
     rules: {
       "react-refresh/only-export-components": "off",
     },

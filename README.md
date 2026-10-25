@@ -1,255 +1,338 @@
-# 🧊 Reflex Cube
-### Prompt-Driven Generative ML & 3D Intelligence Platform
+<h1 align="center">🧊 Reflex Cube</h1>
+<p align="center"><strong>Prompt-driven model generation, and a registry of task-specific AI cubes.</strong></p>
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/python/python-original.svg" width="48" alt="Python"/>
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/react/react-original.svg" width="48" alt="React"/>
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/typescript/typescript-original.svg" width="48" alt="TypeScript"/>
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/fastapi/fastapi-original.svg" width="48" alt="FastAPI"/>
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/docker/docker-original.svg" width="48" alt="Docker"/>
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/threejs/threejs-original.svg" width="48" alt="ThreeJs"/>
-  <img src="https://raw.githubusercontent.com/devicons/devicon/master/icons/pytorch/pytorch-original.svg" width="48" alt="PyTorch"/>
+  <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" alt="Python 3.10+"/>
+  <img src="https://img.shields.io/badge/FastAPI-backend-009688?logo=fastapi&logoColor=white" alt="FastAPI"/>
+  <img src="https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black" alt="React 18"/>
+  <img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript 5"/>
+  <img src="https://img.shields.io/badge/PyTorch-training-EE4C2C?logo=pytorch&logoColor=white" alt="PyTorch"/>
+  <img src="https://img.shields.io/badge/Three.js-WebGL-000000?logo=three.js&logoColor=white" alt="Three.js"/>
+  <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT licence"/>
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Main%20Goal-Prompt%20to%20Model%20Generation-ff007f?logo=pytorch"/>
-  <img src="https://img.shields.io/badge/Machine%20Learning-Enabled-brightgreen"/>
-  <img src="https://img.shields.io/badge/Artificial%20Intelligence-Modular-blueviolet"/>
-  <img src="https://img.shields.io/badge/Cubes%20Registry-15%20Active-00f2fe"/>
-  <img src="https://img.shields.io/badge/Python-3.10%2B-blue?logo=python"/>
-  <img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi"/>
-  <img src="https://img.shields.io/badge/React-Vite-61DAFB?logo=react"/>
-  <img src="https://img.shields.io/badge/Three.js-3D_UI-black?logo=three.js"/>
-</p>
+![Reflex Cube](docs/screenshots/01-landing.png)
+
+> **Run it online, free.** The whole stack deploys at no cost: the API on
+> Hugging Face Spaces, Postgres on Neon, trained models on the Hugging Face
+> Hub, the client on Vercel. See **[docs/hosting.md](docs/hosting.md)**.
 
 ---
 
-## 🚀 Overview
+## What it is
 
-**Reflex Cube** is a modular AI-powered platform designed to build, run, and visualize custom AI models and intelligent applications directly from natural language prompts. Combining deep learning backends with an immersive, interactive 3D WebGL user interface, it provides developers and researchers with a comprehensive playground for model generation, log monitoring, and intelligent agent simulation.
+Reflex Cube does two things.
 
-At the core of the platform is the **"Cube Architecture"**: independent, task-oriented AI modules (Cubes) executing isolated business logic, data evaluation, and ML predictions.
+**It turns a prompt into a trained model.** You describe what you want —
+*"build a sentiment analysis model for movie reviews"* — and the backend infers
+the task, picks a base model and a real dataset from the Hugging Face Hub,
+fine-tunes in a background process, and streams epoch and loss back to the
+browser while it runs. The result is a downloadable checkpoint you can run
+inference against from the dashboard.
+
+**It runs a registry of Intelligence Cubes.** Each cube is a self-contained
+capability — contract review, forensic invoice audit, OCR, image
+classification, WAF simulation — behind one dispatch endpoint and its own
+console in the web app.
+
+| | |
+|:---:|:---:|
+| ![The studio](docs/screenshots/03-studio.png) | ![The cube registry](docs/screenshots/04-cube-registry.png) |
+| *The studio — describe a model, watch it train* | *The cube registry* |
+| ![A cube console](docs/screenshots/05-cube-console.png) | ![Dark theme](docs/screenshots/06-dark-theme.png) |
+| *A cube console* | *Dark theme* |
 
 ---
 
-## 🎯 Primary Objective: Prompt-to-Model Generation
+## Quick start
 
-The main goal of Reflex Cube is **dynamic, automated deep learning model compilation directly from natural language prompts**. Instead of manually configuring training scripts, preprocessing text, or setting up models, users write a prompt describing what they want (e.g., *"build a sentiment analysis model for movie reviews"*), and the system handles the rest.
+**Requirements:** Python 3.10+, Node 20.19+, and `make` (optional but assumed
+below).
 
-### 🔄 The Prompt-to-Model Pipeline
+```bash
+git clone https://github.com/kh-bikash/Reflex-Cube.git
+cd Reflex-Cube
+
+make setup     # backend venv + frontend node_modules
+make dev       # API on :8000, web client on :8080
+```
+
+Open <http://localhost:8080>. The API's interactive docs are at
+<http://localhost:8000/docs>.
+
+`make setup` installs the **core** backend, which starts in seconds and gives
+you the full API, the cube catalog, job tracking, log streaming and nine of the
+sixteen cubes. Training and the model-backed cubes need the ML stack:
+
+```bash
+make setup-backend-ml      # torch, transformers, datasets, … (several GB)
+```
+
+Run `make env` at any point to see which optional packages and credentials are
+present, and which cubes can load as a result.
+
+<details>
+<summary>Without <code>make</code></summary>
+
+```bash
+# Backend
+cd backend
+python -m venv .venv
+source .venv/bin/activate            # Windows: .venv\Scripts\activate
+pip install -r requirements.txt      # or requirements-ml.txt for training
+uvicorn app.api:app --reload --port 8000
+
+# Frontend, in a second terminal
+cd frontend
+npm ci
+npm run dev
+```
+
+</details>
+
+<details>
+<summary>With Docker</summary>
+
+```bash
+docker compose up --build            # API :8000, web client :8080
+```
+
+The default backend image is API-only so it builds quickly. For training:
+
+```bash
+INSTALL_ML=true docker compose up --build
+```
+
+</details>
+
+---
+
+## How prompt-to-model works
 
 ```mermaid
 graph TD
-    A[User Natural Language Prompt] --> B[Interpreter Engine app/interpreter.py]
-    B -->|Task Heuristics| C[Deduce ML Task e.g., Sentiment, Classification, Translation]
-    B -->|Model Registry| D[Select Optimal Base Model & Dataset from Hugging Face]
-    C & D --> E[Trainer Engine app/trainer.py]
-    E -->|Download Dataset| F[Fetch Real Dataset from HF Hub]
-    E -->|Preprocessing| G[Tokenize & Map Labels Dynamically]
-    E -->|Decoupled Execution| H[PyTorch Training Loop in Background Subprocess]
-    H -->|SSE Logs Streaming| I[Real-time Epoch/Loss Progress to Client]
-    H -->|Model Serialization| J[Save Pretrained Weights, Tokenizer & Zipped state-dicts]
+    A[Prompt] --> B[detect_task<br/>trainer.py]
+    B --> C[PromptInterpreter<br/>interpreter.py]
+    C -->|Hub search, curated fallbacks| D[Base model + dataset]
+    D --> E[train_worker.py<br/>detached subprocess]
+    E --> F[Download real dataset<br/>Hugging Face Hub]
+    F --> G[Tokenize, map labels,<br/>hold out an eval split]
+    G --> H[Fine-tune<br/>PyTorch / Trainer]
+    H -->|JSONL events| I[GET /api/logs/:id<br/>server-sent events]
+    H --> J[Checkpoint + tokenizer<br/>+ metrics.json]
+    J --> K[POST /api/models/:id/predict<br/>GET /api/models/download/:id]
 ```
 
-### ⚙️ Deep Dive into the Pipeline Components:
-1. **Prompt Parsing & Task Resolution ([interpreter.py](file:///d:/Projects/reflexcube-v2/backend/app/interpreter.py))**:
-   - Parses the query to classify the required task (e.g., `summarization`, `translation`, `text-generation`, `sentiment-analysis`, `text-classification`, `token-classification`).
-   - Selects a high-performance pre-trained base model and dataset (e.g., `imdb`, `ag_news`, `squad`, etc.) from Hugging Face, with fallback resolvers for stability.
-2. **Dynamic Data Loading ([trainer.py](file:///d:/Projects/reflexcube-v2/backend/app/trainer.py))**:
-   - Enforces downloading real-world datasets using Hugging Face's `load_dataset` (no mock data).
-   - Maps column fields (e.g., `text`, `document`, `context` vs `label`, `sentiment`, `ner_tags`) to model inputs dynamically.
-3. **Decoupled Asynchronous Training**:
-   - Spawns background subprocesses to run the training loops (`train_worker.py`). This prevents global interpreter lock (GIL) blockages in the primary FastAPI server.
-   - StreamLog callbacks write jsonl logs which stream live loss and epoch progress to the frontend using Server-Sent Events (SSE).
-4. **Serialization & Archiving**:
-   - Saves final checkpoints locally inside the persistent `storage/` volume.
-   - Archives tokenizer configurations and state dict weights in standard `.zip` files ready for production deployment.
+1. **Task resolution** — `detect_task` honours an explicit task, otherwise it
+   reads the prompt. Everything maps onto a canonical Hugging Face task name.
+2. **Model and dataset** — `PromptInterpreter` searches the Hub for a dataset
+   matching the prompt's content words, filtered by task and sorted by
+   downloads. When the search finds nothing loadable it falls back to a
+   curated corpus for the prompt's domain (`imdb` for reviews, `banking77` for
+   finance, `conll2003` for entities, …). Base models default to small
+   architectures that fine-tune in minutes on CPU, unless the prompt names one.
+3. **Training out of process** — the job runs in a detached subprocess, so a
+   CPU-bound fine-tune never blocks the event loop. Progress is appended as
+   JSONL and mirrored into the job row.
+4. **Live progress** — `GET /api/logs/{job_id}` tails that file as server-sent
+   events and closes when the job reaches a terminal state.
+5. **Results** — the checkpoint, tokenizer and `metrics.json` are saved under
+   `STORAGE_PATH/<job_id>/`, ready for inference or download as a zip.
+
+Datasets are always real downloads from the Hub. A job that cannot fetch one
+fails with the reason rather than quietly training on synthetic data.
+
+> **Sample caps.** Hub corpora run to millions of rows and an uncapped CPU
+> fine-tune never finishes, so jobs use `MAX_TRAIN_SAMPLES` (default 2,000)
+> rows, shuffled before slicing. Raise it, or set it to `0` for no cap, in
+> `backend/.env`.
 
 ---
 
-## 🧠 The LLM Training Sandbox (Forge Cube)
+## The Forge: training an LLM from scratch
 
-For custom-trained autoregressive models, the platform features the **Forge Cube**, allowing users to design, train, and test custom causal language models (**NanoGPT**) from scratch.
+The Forge cube is a sandbox for building a small causal language model
+(NanoGPT) end to end — architecture, training loop, sampling — rather than
+fine-tuning someone else's.
 
-### 📊 NanoGPT Block Architecture
+![NanoGPT block architecture](docs/llm_architecture.svg)
 
-![NanoGPT Block Architecture](llm_architecture.svg)
+The implementation lives in
+[`backend/app/cubes/forge_core/model.py`](backend/app/cubes/forge_core/model.py):
 
-### 🧱 Architectural Sub-components
-
-As defined in the core [model.py](file:///d:/Projects/reflexcube-v2/backend/app/cubes/forge_core/model.py):
-
-* **`CausalSelfAttention`**:
-  - Projects inputs into Query ($Q$), Key ($K$), and Value ($V$) representations.
-  - Implements multi-head split calculations transposed for parallel head computation.
-  - Utilizes a causal triangular mask buffer (`tril`) to ensure autoregressive tokens cannot attend to future slots.
-* **`MLP` (Multi-Layer Perceptron)**:
-  - Projects context embeddings from $C \to 4C$ via a linear layer.
-  - Applies **GELU** (Gaussian Error Linear Unit) activations and projects back to dimension $C$.
-* **`Block` (Transformer Block)**:
-  - Employs **Pre-Layer Normalization** (Pre-LN) layout for training stability.
-  - Links inputs around attention and feed-forward nets using double residual bypass routes.
-* **`NanoGPT`**:
-  - Joins Token (`wte`) and Positional (`wpe`) embeddings.
-  - Employs **Weight Tying** between the input embedding and final language modeling head (`lm_head.weight = wte.weight`) to optimize parameters.
+- **`CausalSelfAttention`** — projects to Q, K and V, splits across heads, and
+  masks with a triangular buffer so a position cannot attend to its future.
+- **`MLP`** — expands `C → 4C`, applies GELU, projects back to `C`.
+- **`Block`** — pre-layer-norm, with residual paths around both the attention
+  and the feed-forward sublayers.
+- **`NanoGPT`** — token and positional embeddings, with the embedding matrix
+  tied to the language-modelling head.
 
 ---
 
-## 🕹️ Interactive 3D WebGL Canvas
+## The Intelligence Cubes
 
-Reflex Cube provides a premium, real-time dashboard visualizing the model training pipeline:
-* **Interactive 3D Grid**: Built on React Three Fiber (`@react-three/fiber`), allowing direct rotation, zoom, and selection of active Intelligence Cubes.
-* **Log Stream Visualizer**: Streams standard output and training epoch loss curves in a stylized retro HUD terminal using Recharts and Framer Motion.
+Every cube implements one interface and is reachable at `POST /api/cubes/run`
+with `{"cube_id": "...", "input": {...}}`. The registry imports each cube
+lazily, so one missing optional dependency marks only that cube unavailable —
+`GET /api/health` and `make env` report which.
 
----
+| Cube | Does | Needs |
+| :--- | :--- | :--- |
+| 🔨 **Forge** | Design, train and sample a NanoGPT from scratch | torch, tiktoken |
+| 👁️ **Vision** | Label an image dataset, augment it, train a classifier, inspect it | torch, torchvision, Pillow |
+| 💭 **Dream** | Train a small diffusion model and sample from a prompt | torch, torchvision, Pillow |
+| 🍳 **Chef** | Read ingredients from a photo, return a safety check and a recipe | torch, transformers, Pillow |
+| 📈 **Alpha** | Live market metrics, a valuation rating and an investment thesis | yfinance |
+| 🔗 **Nexus** | Persistent semantic memory you can write to and recall from | torch, transformers |
+| 🔍 **Lens** | OCR an image and return clean, summarised text | torch, easyocr |
+| 🛡️ **Sentinel** | Detect SQLi, XSS and flooding; manage WAF rules | core only |
+| ⚖️ **Legal** | Score a contract for compliance and surface liabilities | core (pypdf for PDFs) |
+| 📓 **Ledger** | Reconcile invoices against a bank feed, flag discrepancies | core only |
+| 🧑‍💼 **Talent** | Derive scoring criteria from a job description, screen CVs | core only |
+| 💼 **Career** | Map a growth path; rewrite a resume for ATS filters | core (pypdf for PDFs) |
+| 🏷️ **Brand** | Naming, copy and identity guidelines | core only |
+| 🏋️ **FitPal** | Training plans from biometrics and goals | core only |
+| ✈️ **Travel** | Itineraries with budget, weather and day-by-day routing | core only |
+| 📜 **Legacy** | Capture and query long-form personal history | core only |
 
-## 🧠 The 15 Intelligence Cubes Registry
+Two further consoles — **Research** and **Social** — have no Python module.
+They take a free-text prompt and are served by the ReflexBrain agent loop,
+which reasons, optionally executes its own Python in an
+[E2B](https://e2b.dev) sandbox to search and scrape, and returns a markdown
+report.
 
-The registry contains 15 active modules interacting with the main gateway:
-
-| Icon | Cube Name | Primary Function | Key Features & Implementation |
-| :---: | :--- | :--- | :--- |
-| 🔨 | **Forge Cube** | LLM Training Sandbox | Architect, configure (layers, attention heads), and train mini language models from scratch. |
-| 🧑‍💼 | **Talent Cube** | Recruitment & CV Parsing | Batchscreens candidate resumes against dynamic job descriptions, outputting match scores and hire recommendations. |
-| 🔗 | **Nexus Cube** | Memory & Relational context | Collects continuous contextual knowledge and acts as a secondary brain database. |
-| ⚖️ | **Legal Cube** | Contract Compliance | Parses legal documents, highlights liabilities, and evaluates contract compliance scores. |
-| 🍳 | **Chef Cube** | Culinary AI | Analyzes food descriptions or ingredients and generates safety analysis and recipe steps. |
-| 📈 | **Alpha Cube** | Financial Analysis | Fetches market details and calculates P/E, market capitalization, ratings, and investment theses. |
-| 💼 | **Career Cube** | Career Growth | Builds personalized career paths and analyzes trajectory growth steps. |
-| 🏷️ | **Brand Cube** | Marketing & Identity | Generates copy, corporate branding, and logo guidelines. |
-| 🏋️ | **FitPal Cube** | Biometrics & Health | Designs custom workout regimens and monitors fitness metrics. |
-| ✈️ | **Travel Cube** | Travel Planner | Generates comprehensive travel itineraries, budget estimates, and weather guides. |
-| 🛡️ | **Sentinel Cube** | Cybersecurity & WAF | Monitors logs, simulates attack prevention, and manages custom firewall rules. |
-| 📓 | **Ledger Cube** | Financial Forensic Audit | Compares invoice details with bank transactions, flagging discrepancies and fake vendors. |
-| 👁️ | **Vision Cube** | Neural Network Lab | Interactive image dataset loader with data augmentation configs, custom classification training, and X-Ray visualizer. |
-| 💭 | **Dream Cube** | Generative Art & Ideation | Custom generative model pipeline for image-text prompt synthesis. |
-| 🔍 | **Lens Cube** | OCR & Content Summarization | Performs optical character recognition on uploaded images and extracts clean text details. |
-
----
-
-## 🛠️ Technology Stack
-
-### Frontend UI / Visuals
-- **Framework**: React 18, Vite, TypeScript
-- **3D Render**: Three.js, React Three Fiber, React Three Drei
-- **State Management**: Valtio
-- **Animations**: Framer Motion, GSAP (Lenis Smooth Scroll)
-- **Visualizations**: Recharts, TailwindCSS
-- **Design System**: Shadcn UI (Radix Primitives)
-
-### Backend Services
-- **API Gateway**: Python 3.10+, FastAPI, Uvicorn
-- **Execution Concurrency**: `subprocess.Popen` task delegation for CPU-bound training tasks.
-- **Deep Learning**: PyTorch, Hugging Face Transformers
-- **Database**: SQLite (via SQLAlchemy) configured with volume persistence.
+Adding a cube is two files and a registry entry — see
+[CONTRIBUTING.md](CONTRIBUTING.md#adding-a-cube).
 
 ---
 
-## 📂 System Directory Structure
+## API
+
+Full interactive reference at `/docs` once the server is running, and a written
+one in [docs/api.md](docs/api.md). The essentials:
+
+| Method | Path | Purpose |
+| :--- | :--- | :--- |
+| `POST` | `/api/auth/register` | Create an account → `{access_token, user}` |
+| `POST` | `/api/auth/login` | Sign in → `{access_token, user}` |
+| `GET` | `/api/auth/me` | The signed-in account |
+| `PATCH` | `/api/auth/me` | Change the name, password or Hub token |
+| `GET` | `/api/health` | Status, version, database, cubes, capabilities |
+| `POST` | `/api/models/create` | Queue a prompt for training → `{job_id}` |
+| `GET` | `/api/training/status/{job_id}` | Progress, epoch, loss, accuracy |
+| `GET` | `/api/logs/{job_id}` | Live training log (server-sent events) |
+| `GET` | `/api/models/all` | Every job, newest first |
+| `POST` | `/api/models/{job_id}/predict` | Inference against a trained model |
+| `GET` | `/api/models/download/{job_id}` | Checkpoint as a zip archive |
+| `DELETE` | `/api/models/{job_id}` | Delete a job and its artefacts |
+| `GET` | `/api/cubes` | The cube catalog |
+| `POST` | `/api/cubes/run` | Dispatch to a cube |
+| `POST` | `/api/cubes/pdf` | Render a markdown report to PDF |
+
+More recipes, and a script that runs a downloaded checkpoint, are in
+[examples/](examples/).
+
+Everything that spends CPU needs an account:
+
+```bash
+# Sign in
+TOKEN=$(curl -sS -X POST localhost:8000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"your-password"}' \
+  | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+# Queue a model
+curl -X POST localhost:8000/api/models/create \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"name":"review-sentiment","prompt":"classify movie reviews as positive or negative"}'
+
+# Watch it train
+curl -N -H "Authorization: Bearer $TOKEN" localhost:8000/api/logs/<job_id>
+
+# Run a cube
+curl -X POST localhost:8000/api/cubes/run \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"cube_id":"alpha","input":{"text":"AAPL"}}'
+```
+
+---
+
+## Layout
 
 ```text
-📦 ReflexCube
- ┣ 📂 backend
- ┃ ┣ 📂 app
- ┃ ┃ ┣ 📂 cubes           # The 15 Intelligence Cubes (e.g. sentinel.py, forge.py)
- ┃ ┃ ┣ 📂 routes          # Gateway API endpoints
- ┃ ┃ ┣ 📂 utils           # AI routers and db connectivity
- ┃ ┃ ┣ 📜 api.py          # FastAPI server entry point
- ┃ ┃ ┣ 📜 brain.py        # Relational inference logic
- ┃ ┃ ┣ 📜 models.py       # SQLAlchemy DB schemas
- ┃ ┃ ┗ 📜 trainer.py      # ML Model generation pipelines
- ┃ ┣ 📂 tests             # Verification tests
- ┃ ┣ 📜 train_worker.py   # Background process runner for ML models
- ┃ ┗ 📜 requirements.txt  # Python environment requirements
- ┣ 📂 frontend
- ┃ ┣ 📂 src
- ┃ ┃ ┣ 📂 components      # UI Bento grids, footers, & cubes pages
- ┃ ┃ ┃ ┗ 📂 cubes         # Frontend views for the 15 Registry cubes
- ┃ ┃ ┣ 📂 pages           # Router routes (e.g. CubePage, Services, Home)
- ┃ ┃ ┣ 📂 lib             # Core API wrappers & utilities
- ┃ ┃ ┣ 📜 App.tsx         # Route mappings
- ┃ ┃ ┗ 📜 main.tsx        # Render entrypoint
- ┃ ┗ 📜 eslint.config.js  # Code quality rules
- ┣ 📂 storage             # Output folder for zip models and SQLite DB files
- ┣ 📜 docker-compose.yml  # Deployment configuration
- ┣ 📜 llm_architecture.svg# Standalone animated SVG architecture graph
- ┗ 📜 README.md           # Documentation
+Reflex-Cube/
+├── backend/
+│   ├── app/
+│   │   ├── api.py            # Application factory and lifespan
+│   │   ├── routes/           # models · cubes · logs · system
+│   │   ├── cubes/            # The 16 cube implementations + registry
+│   │   ├── trainer.py        # Prompt-to-model pipeline
+│   │   ├── interpreter.py    # Prompt → base model + dataset
+│   │   ├── brain.py          # ReflexBrain agent loop (lazy-loaded)
+│   │   ├── config.py         # Env-driven settings; the only source of paths
+│   │   ├── db.py · models.py · schemas.py
+│   │   └── utils/            # Path helpers and the AI provider router
+│   ├── scripts/              # check_env · reset_db · cancel_jobs
+│   ├── tests/                # 216 pytest tests
+│   └── train_worker.py       # Detached training process
+├── frontend/
+│   └── src/
+│       ├── components/cubes/ # One console per cube
+│       ├── pages/            # Route targets
+│       └── lib/
+│           ├── api.ts        # Typed backend client
+│           └── cubes.ts      # Cube catalog (ids must match the backend)
+├── docs/                     # Architecture, API, deployment
+├── examples/                 # Run a downloaded model; curl recipes
+└── docker-compose.yml        # Full stack: API + nginx-served client
 ```
 
 ---
 
-## 🔌 API Reference
+## Configuration
 
-### 1. Training & Inference Models
-* `POST /api/models/create` — Queues a prompt to start background model generation.
-  * *Request*: `{ "name": "Model-Name", "prompt": "Text description...", "task": "classification" }`
-  * *Response*: `{ "status": "queued", "job_id": "job-uuid" }`
-* `GET /api/training/status/{job_id}` — Returns current compilation progress, epoch metrics, and status.
-* `GET /api/logs/{job_id}` — Text/Event-Stream (SSE) logs streamed directly from standard out.
-* `POST /api/models/{job_id}/predict` — Runs custom text inference with the trained model.
-  * *Request*: `{ "text": "Inference input" }`
-* `GET /api/models/download-zip-stream/{job_id}` — Streams the compiled `.pt` state dict zip archive.
+Everything is environment-driven with working defaults; see
+[`backend/.env.example`](backend/.env.example) and
+[`frontend/.env.example`](frontend/.env.example) for the full list. The ones
+you are most likely to touch:
 
-### 2. Direct Cube Actions
-* `POST /api/cubes/run` — Executes actions on a specific registered Cube.
-  * *Payload Example (yFinance audit)*: `{ "cube_id": "alpha", "input": { "text": "TSLA" } }`
-  * *Payload Example (Forensic check)*: `{ "cube_id": "ledger", "input": { "invoices": "...", "bank_feed": "..." } }`
-
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- **Node.js 18+**
-- **Python 3.10+** (with pip)
-- **Git & Git LFS** (Required to pull local `.pt` test weight cache)
-
-### 📦 Git LFS Installation
-Ensure you pull the large tensor files before running the project:
-```bash
-git lfs install
-git lfs pull
-```
-
-### 1. Backend Launch
-Setup a virtual environment and launch FastAPI:
-```bash
-cd backend
-python -m venv venv
-
-# Activate venv
-# On Windows:
-venv\Scripts\activate
-# On macOS/Linux:
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run server
-uvicorn app.api:app --reload --host 0.0.0.0 --port 8000
-```
-FastAPI Swagger will be live at `http://localhost:8000/docs`.
-
-### 2. Frontend Launch
-Install dependencies and run the Vite dev server:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-Open `http://localhost:5173` to explore the dashboard.
-
-### 3. Running Stability Tests
-Ensure correct routing and fallback connectivity:
-```bash
-python backend/tests/verify_stability.py
-```
+| Variable | Default | Purpose |
+| :--- | :--- | :--- |
+| `JWT_SECRET` | generated | **Required in any deployment.** Signs sessions; must be ≥32 bytes |
+| `DATABASE_URL` | `sqlite:///backend/reflex.db` | Accounts and jobs. Use hosted Postgres anywhere real |
+| `CORS_ORIGINS` | `localhost:8080`, `localhost:5173` | Browser origins allowed to call the API |
+| `REFLEX_DATA_DIR` | `./storage` | Root for checkpoints, logs and caches |
+| `PUBLISH_MODELS_TO_HUB` | `0` | Push finished models to the Hub so they outlive the container |
+| `HF_TOKEN` | — | A *write* token: enables publishing, and gated models |
+| `MAX_TRAIN_SAMPLES` | `2000` | Training rows per job; `0` for no cap |
+| `MAX_MODEL_PARAMETERS` | `200000000` | Refuse a model too large for the instance, with a reason |
+| `REQUIRE_AUTH` | `1` | Turn off only for a single-user local install |
+| `E2B_API_KEY` | — | Enables the agent's code sandbox |
 
 ---
 
-## 🤝 Contributing
-Feel free to open issues or submit PRs to expand the AI Cube Registry, improve WebGL rendering, or build additional deep learning models.
+## Development
 
-## 📄 License
-MIT License.
+```bash
+make check      # ruff + ESLint + tsc + pytest — the same checks CI runs
+make format     # autofix both sides
+make test       # pytest with coverage
+make env        # what's installed, what's configured, which cubes can load
+```
+
+CI runs the backend suite (263 tests) on Linux, macOS and Windows, builds both
+Docker images, and gates on `npm audit`. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for conventions, and
+[docs/architecture.md](docs/architecture.md) for how the pieces fit together.
+
+## Security
+
+Accounts are required by default, and every job belongs to the user who created
+it. [SECURITY.md](SECURITY.md) covers what else the platform exposes — the
+agent's code sandbox, third-party model downloads — and how to report a
+vulnerability.
+
+## Licence
+
+[MIT](LICENSE).

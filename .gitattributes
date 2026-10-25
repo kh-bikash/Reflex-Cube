@@ -1,2 +1,13 @@
-*.safetensors filter=lfs diff=lfs merge=lfs -text
-*.zip filter=lfs diff=lfs merge=lfs -text
+# Normalise line endings so a Windows checkout does not rewrite every file.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.zip binary
+*.pt  binary
+*.bin binary
+
+# Generated; collapse in diffs and exclude from language stats.
+frontend/package-lock.json linguist-generated=true -diff
+docs/screenshots/* linguist-documentation

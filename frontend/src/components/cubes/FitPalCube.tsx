@@ -90,7 +90,7 @@ export default function FitPalCube() {
             {/* Header */}
             <div className="flex items-center gap-4 mb-8 pb-6 border-b border-border">
                 <div className="bg-orange-500 p-3 rounded-xl">
-                    <Dumbbell className="text-black" size={32} />
+                    <Dumbbell className="text-foreground" size={32} />
                 </div>
                 <div>
                     <h1 className="text-4xl font-black italic uppercase tracking-wider">FitPal</h1>
@@ -136,7 +136,7 @@ export default function FitPalCube() {
                                 {/* Selected List */}
                                 <div className="flex flex-wrap gap-2">
                                     {equipmentList.map(item => (
-                                        <span key={item} className="bg-orange-500 text-black px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2">
+                                        <span key={item} className="bg-orange-500 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center gap-2">
                                             {item} <X size={14} className="cursor-pointer hover:text-foreground" onClick={() => setEquipmentList(l => l.filter(i => i !== item))} />
                                         </span>
                                     ))}
@@ -176,7 +176,7 @@ export default function FitPalCube() {
 
                             <button
                                 onClick={generateWorkout}
-                                className="w-full bg-orange-500 hover:bg-orange-600 text-black font-black italic uppercase py-4 rounded-xl text-xl tracking-wider transition-all transform hover:scale-[1.02] shadow-xl shadow-orange-500/20 mt-8"
+                                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-black italic uppercase py-4 rounded-xl text-xl tracking-wider transition-all transform hover:scale-[1.02] shadow-xl shadow-orange-500/20 mt-8"
                             >
                                 Generate Input
                             </button>

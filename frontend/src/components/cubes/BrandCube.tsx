@@ -56,13 +56,13 @@ export default function BrandCube() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Describe your brand..."
-                            className="bg-muted/50 border border-border px-4 py-2 rounded-lg w-80 focus:outline-none focus:border-white/30 transition-colors"
+                            className="bg-muted/50 border border-border px-4 py-2 rounded-lg w-80 focus:outline-none focus:border-border transition-colors"
                             onKeyDown={(e) => e.key === 'Enter' && generate()}
                         />
                         <button
                             onClick={generate}
                             disabled={loading}
-                            className="bg-white text-black px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition-colors disabled:opacity-50"
+                            className="bg-card text-foreground px-6 py-2 rounded-lg font-bold hover:bg-muted transition-colors disabled:opacity-50"
                         >
                             {loading ? 'Distilling...' : 'Ignite'}
                         </button>
@@ -75,7 +75,7 @@ export default function BrandCube() {
                     <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        className="w-16 h-16 border-t-2 border-white rounded-full mb-8"
+                        className="w-16 h-16 border-t-2 border-border rounded-full mb-8"
                     />
                     <p className="font-mono text-foreground/50 animate-pulse">ANALYZING BRAND DNA...</p>
                 </div>
@@ -162,7 +162,7 @@ export default function BrandCube() {
 
                     {/* 5. Voice & Tone (Bottom Right) */}
                     <div className="col-span-12 md:col-span-4 bg-gradient-to-br from-purple-900/20 to-blue-900/20 rounded-3xl p-8 border border-border flex flex-col justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+                        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20" />
                         <Mic2 className="mb-4 text-purple-400" />
                         <h3 className="text-xl font-bold mb-2">Brand Voice</h3>
                         <p className="text-2xl text-foreground/80 font-light leading-relaxed">

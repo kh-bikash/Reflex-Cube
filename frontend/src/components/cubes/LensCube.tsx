@@ -91,7 +91,7 @@ export const LensCube = () => {
                                 <p className="text-muted-foreground mb-6">Drop an image to identify objects or text.</p>
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-foreground rounded-lg font-medium transition-colors"
+                                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
                                 >
                                     Activate Camera / Upload
                                 </button>
@@ -108,7 +108,7 @@ export const LensCube = () => {
                         {image && !analyzing && !result && (
                             <button
                                 onClick={handleAnalyze}
-                                className="absolute bottom-8 left-1/2 -translate-x-1/2 px-8 py-3 bg-white text-black font-bold rounded-full shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
+                                className="absolute bottom-8 left-1/2 -translate-x-1/2 px-8 py-3 bg-card text-foreground font-bold rounded-full shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
                             >
                                 <Search size={18} /> Deep Scan
                             </button>
