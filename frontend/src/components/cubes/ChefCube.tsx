@@ -100,7 +100,7 @@ export const ChefCube = () => {
                                 <p className="text-muted-foreground mb-4">Upload a photo of your fridge</p>
                                 <button
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-foreground rounded-lg font-medium transition-colors"
+                                    className="px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors"
                                 >
                                     Select Photo
                                 </button>
@@ -148,7 +148,7 @@ export const ChefCube = () => {
                     {(image || textInput) && !analyzing && !result && (
                         <button
                             onClick={handleAnalyze}
-                            className="w-full py-4 bg-white text-black font-bold rounded-xl shadow-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
+                            className="w-full py-4 bg-card text-foreground font-bold rounded-xl shadow-xl hover:scale-[1.02] transition-transform flex items-center justify-center gap-2"
                         >
                             <Flame size={18} className="text-orange-600" />
                             Generate Recipe
@@ -255,7 +255,7 @@ export const ChefCube = () => {
                                         <div className="space-y-6">
                                             {result.recipe?.steps?.map((step: string, i: number) => (
                                                 <div key={i} className="flex gap-4 group">
-                                                    <span className="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex-shrink-0 flex items-center justify-center text-sm font-bold group-hover:bg-orange-500 group-hover:text-foreground transition-colors">
+                                                    <span className="w-8 h-8 rounded-full bg-orange-500/20 text-orange-400 flex-shrink-0 flex items-center justify-center text-sm font-bold group-hover:bg-orange-500 group-hover:text-white transition-colors">
                                                         {i + 1}
                                                     </span>
                                                     <p className="text-foreground/80 leading-relaxed text-sm pt-1 border-b border-border pb-4 w-full">{step}</p>

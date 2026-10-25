@@ -77,7 +77,7 @@ export default function TravelCube() {
                         />
                         <button
                             onClick={generateItinerary}
-                            className="bg-sky-500 hover:bg-sky-400 text-foreground px-6 py-2 rounded-xl font-bold transition-transform active:scale-95"
+                            className="bg-sky-500 hover:bg-sky-400 text-white px-6 py-2 rounded-xl font-bold transition-transform active:scale-95"
                         >
                             Fly
                         </button>

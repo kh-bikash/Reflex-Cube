@@ -113,8 +113,8 @@ export const DreamCube = () => {
 
                     {/* Tabs */}
                     <div className="flex bg-muted/50 p-1 rounded-lg mb-6">
-                        <button onClick={() => setActiveTab('generate')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-colors ${activeTab === 'generate' ? 'bg-pink-600 text-foreground' : 'text-muted-foreground'}`}>Generate</button>
-                        <button onClick={() => setActiveTab('train')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-colors ${activeTab === 'train' ? 'bg-pink-600 text-foreground' : 'text-muted-foreground'}`}>Forge Model</button>
+                        <button onClick={() => setActiveTab('generate')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-colors ${activeTab === 'generate' ? 'bg-pink-600 text-white' : 'text-muted-foreground'}`}>Generate</button>
+                        <button onClick={() => setActiveTab('train')} className={`flex-1 py-2 text-xs font-bold rounded-md transition-colors ${activeTab === 'train' ? 'bg-pink-600 text-white' : 'text-muted-foreground'}`}>Forge Model</button>
                     </div>
 
                     {activeTab === 'generate' ? (
@@ -212,7 +212,7 @@ export const DreamCube = () => {
                                 <button
                                     onClick={handleTrain}
                                     disabled={isTraining}
-                                    className="flex-1 py-3 bg-white text-black font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-gray-200"
+                                    className="flex-1 py-3 bg-card text-foreground font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-muted"
                                 >
                                     {isTraining ? "Training..." : "Start Training"}
                                 </button>

@@ -1,34 +1,45 @@
 import React from "react";
+import { BrowserRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+import { AnimatedRoutes } from "./components/AnimatedRoutes";
+import { AppLayout } from "./components/layout/AppLayout";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { Toaster } from "./components/ui/toaster";
 import { Toaster as Sonner } from "./components/ui/sonner";
 import { TooltipProvider } from "./components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter } from "react-router-dom";
-import { AnimatedRoutes } from "./components/AnimatedRoutes";
+import { AuthProvider } from "./lib/auth";
+import { ThemeProvider } from "./lib/theme";
 
-import { Scene } from "./components/canvas/Scene";
-import { HeroBackground } from "./components/canvas/HeroBackground";
-import { AppLayout } from "./components/layout/AppLayout";
-import { ScrollToTop } from "./components/ScrollToTop";
-
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // A free backend can be slow to wake; one quiet retry beats showing an
+      // error the user would only have to dismiss and retry by hand.
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
+    },
+  },
+});
 
 const App: React.FC = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      {/* <Scene className="fixed inset-0 z-0">
-        <HeroBackground />
-      </Scene> */}
+  <ThemeProvider>
+    <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <ScrollToTop />
-        <AppLayout>
-          <AnimatedRoutes />
-        </AppLayout>
+        <AuthProvider>
+          <TooltipProvider delayDuration={200}>
+            <ScrollToTop />
+            <AppLayout>
+              <AnimatedRoutes />
+            </AppLayout>
+            <Toaster />
+            <Sonner />
+          </TooltipProvider>
+        </AuthProvider>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;

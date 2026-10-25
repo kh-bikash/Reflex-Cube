@@ -1,108 +1,86 @@
 import { Suspense, lazy } from "react";
-import { Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
-import { Loader2 } from "lucide-react";
+import { Route, Routes, useLocation } from "react-router-dom";
 
-import Index from "../pages/index";
-import { PageTransition } from "./ui/PageTransition";
+import Home from "../pages/Home";
+import { RequireAuth } from "./RequireAuth";
+import { Spinner } from "./ui/primitives";
 
-// Route-level code splitting: the landing page ships in the initial bundle, the
-// heavier studio/cube routes are fetched on navigation.
+// Route-level code splitting: the landing page ships in the initial bundle,
+// everything else is fetched on navigation.
 const NotFound = lazy(() => import("../pages/NotFound"));
-const PromptModel = lazy(() => import("./PromptModel"));
-const ModelDashboard = lazy(() => import("./ModelDashboard"));
-const Services = lazy(() => import("../pages/Services"));
+const Studio = lazy(() => import("../pages/Studio"));
+const Models = lazy(() => import("../pages/Models"));
+const Cubes = lazy(() => import("../pages/Cubes"));
 const CubePage = lazy(() => import("../pages/CubePage"));
 const DocsTemplate = lazy(() => import("../pages/DocsTemplate"));
+const SignIn = lazy(() => import("../pages/SignIn"));
+const SignUp = lazy(() => import("../pages/SignUp"));
+const Settings = lazy(() => import("../pages/Settings"));
 
 /** Content routes that all render the same documentation shell. */
 const DOC_ROUTES = [
-    "/api-docs",
-    "/changelog",
-    "/documentation",
-    "/blog",
-    "/community",
-    "/support",
-    "/status",
+  "/api-docs",
+  "/changelog",
+  "/documentation",
+  "/blog",
+  "/community",
+  "/support",
+  "/status",
 ] as const;
 
-const RouteFallback = () => (
-    <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-    </div>
-);
-
 export const AnimatedRoutes = () => {
-    const location = useLocation();
+  const location = useLocation();
 
-    return (
-        <AnimatePresence mode="wait">
-            <Suspense fallback={<RouteFallback />}>
-                <Routes location={location} key={location.pathname}>
-                    <Route
-                        path="/"
-                        element={
-                            <PageTransition>
-                                <Index />
-                            </PageTransition>
-                        }
-                    />
-                    <Route
-                        path="/dashboard"
-                        element={
-                            <PageTransition>
-                                <ModelDashboard />
-                            </PageTransition>
-                        }
-                    />
-                    <Route
-                        path="/generate"
-                        element={
-                            <PageTransition>
-                                <PromptModel />
-                            </PageTransition>
-                        }
-                    />
-                    <Route
-                        path="/services"
-                        element={
-                            <PageTransition>
-                                <Services />
-                            </PageTransition>
-                        }
-                    />
-                    <Route
-                        path="/cube/:id"
-                        element={
-                            <PageTransition>
-                                <CubePage />
-                            </PageTransition>
-                        }
-                    />
+  return (
+    <Suspense fallback={<Spinner className="min-h-[60vh]" />}>
+      <Routes location={location}>
+        <Route path="/" element={<Home />} />
+        <Route path="/signin" element={<SignIn />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/services" element={<Cubes />} />
 
-                    {/* Dynamic Content Routes mapping to the Docs Template */}
-                    {DOC_ROUTES.map((path) => (
-                        <Route
-                            key={path}
-                            path={path}
-                            element={
-                                <PageTransition>
-                                    <DocsTemplate />
-                                </PageTransition>
-                            }
-                        />
-                    ))}
+        {DOC_ROUTES.map((path) => (
+          <Route key={path} path={path} element={<DocsTemplate />} />
+        ))}
 
-                    <Route
-                        path="*"
-                        element={
-                            <PageTransition>
-                                <NotFound />
-                            </PageTransition>
-                        }
-                    />
-                </Routes>
-            </Suspense>
-        </AnimatePresence>
-    );
+        {/* Everything below spends server resources or shows private data. */}
+        <Route
+          path="/generate"
+          element={
+            <RequireAuth>
+              <Studio />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <RequireAuth>
+              <Models />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/cube/:id"
+          element={
+            <RequireAuth>
+              <CubePage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <RequireAuth>
+              <Settings />
+            </RequireAuth>
+          }
+        />
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </Suspense>
+  );
 };
+
+export default AnimatedRoutes;

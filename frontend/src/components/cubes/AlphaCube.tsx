@@ -78,7 +78,7 @@ export const AlphaCube = () => {
                         <button
                             onClick={handleAnalyze}
                             disabled={loading}
-                            className="w-full py-3 bg-green-600 hover:bg-green-500 text-black font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            className="w-full py-3 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                         >
                             {loading ? (
                                 <>Analyzing...</>

@@ -56,13 +56,13 @@ export default function BrandCube() {
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
                             placeholder="Describe your brand..."
-                            className="bg-muted/50 border border-border px-4 py-2 rounded-lg w-80 focus:outline-none focus:border-white/30 transition-colors"
+                            className="bg-muted/50 border border-border px-4 py-2 rounded-lg w-80 focus:outline-none focus:border-border transition-colors"
                             onKeyDown={(e) => e.key === 'Enter' && generate()}
                         />
                         <button
                             onClick={generate}
                             disabled={loading}
-                            className="bg-white text-black px-6 py-2 rounded-lg font-bold hover:bg-gray-200 transition-colors disabled:opacity-50"
+                            className="bg-card text-foreground px-6 py-2 rounded-lg font-bold hover:bg-muted transition-colors disabled:opacity-50"
                         >
                             {loading ? 'Distilling...' : 'Ignite'}
                         </button>
@@ -75,7 +75,7 @@ export default function BrandCube() {
                     <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        className="w-16 h-16 border-t-2 border-white rounded-full mb-8"
+                        className="w-16 h-16 border-t-2 border-border rounded-full mb-8"
                     />
                     <p className="font-mono text-foreground/50 animate-pulse">ANALYZING BRAND DNA...</p>
                 </div>

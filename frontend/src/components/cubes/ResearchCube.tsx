@@ -43,9 +43,9 @@ export const ResearchCube = () => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#0a0a0a] text-white">
+        <div className="flex flex-col h-full bg-[#0a0a0a] text-foreground">
             {/* Header */}
-            <div className="p-6 md:p-8 border-b border-white/10 flex items-center gap-4 bg-white/[0.02]">
+            <div className="p-6 md:p-8 border-b border-border flex items-center gap-4 bg-card/[0.02]">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 p-[1px]">
                     <div className="w-full h-full bg-[#0a0a0a] rounded-xl flex items-center justify-center">
                         <Globe className="w-6 h-6 text-blue-400" />
@@ -53,7 +53,7 @@ export const ResearchCube = () => {
                 </div>
                 <div>
                     <h2 className="text-2xl font-bold tracking-tight">OSINT Research Cube</h2>
-                    <p className="text-white/40 text-sm">Autonomous Web Research & Scraping</p>
+                    <p className="text-foreground/40 text-sm">Autonomous Web Research & Scraping</p>
                 </div>
             </div>
 
@@ -72,7 +72,7 @@ export const ResearchCube = () => {
                                 <Search className="w-10 h-10 text-blue-400" />
                             </div>
                             <h3 className="text-2xl font-bold mb-3">What shall we investigate?</h3>
-                            <p className="text-white/40 mb-8 leading-relaxed">
+                            <p className="text-foreground/40 mb-8 leading-relaxed">
                                 Enter a topic, company, or person. The cube will autonomously search the web using SerpApi, scrape the top sources using Apify, and synthesize a comprehensive report.
                             </p>
                         </motion.div>
@@ -91,7 +91,7 @@ export const ResearchCube = () => {
                                 <Loader2 className="w-16 h-16 text-blue-400 animate-spin relative z-10" />
                             </div>
                             <h3 className="text-xl font-bold mt-8 mb-2">Compiling Intelligence...</h3>
-                            <p className="text-white/40 font-mono text-sm animate-pulse">Running Apify & SerpApi Agents</p>
+                            <p className="text-foreground/40 font-mono text-sm animate-pulse">Running Apify & SerpApi Agents</p>
                         </motion.div>
                     )}
 
@@ -105,13 +105,13 @@ export const ResearchCube = () => {
                             <div className="flex justify-end mb-6">
                                 <button
                                     onClick={handleDownloadPdf}
-                                    className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors border border-white/10"
+                                    className="flex items-center gap-2 px-4 py-2 bg-card/10 hover:bg-card/20 text-foreground rounded-lg transition-colors border border-border"
                                 >
                                     <Download className="w-4 h-4" />
                                     <span className="text-sm font-medium">Download PDF Report</span>
                                 </button>
                             </div>
-                            <div className="prose prose-invert max-w-none prose-p:text-white/80 prose-headings:text-white prose-a:text-blue-400 prose-pre:bg-white/5 prose-pre:border prose-pre:border-white/10 p-8 rounded-2xl bg-white/[0.02] border border-white/10">
+                            <div className="prose prose-invert max-w-none prose-p:text-foreground/80 prose-headings:text-foreground prose-a:text-blue-400 prose-pre:bg-card/5 prose-pre:border prose-pre:border-border p-8 rounded-2xl bg-card/[0.02] border border-border">
                                 <ReactMarkdown>{result}</ReactMarkdown>
                             </div>
                         </motion.div>
@@ -127,7 +127,7 @@ export const ResearchCube = () => {
                             <p className="text-xl font-bold">Failed to generate research report.</p>
                             <button 
                                 onClick={() => setStatus("idle")}
-                                className="mt-4 px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors"
+                                className="mt-4 px-4 py-2 bg-card/10 text-foreground rounded-lg hover:bg-card/20 transition-colors"
                             >
                                 Try Again
                             </button>
@@ -137,7 +137,7 @@ export const ResearchCube = () => {
             </div>
 
             {/* Input Form */}
-            <div className="p-6 border-t border-white/10 bg-[#050505]">
+            <div className="p-6 border-t border-border bg-[#050505]">
                 <form onSubmit={handleSubmit} className="max-w-3xl mx-auto relative">
                     <input
                         type="text"
@@ -145,7 +145,7 @@ export const ResearchCube = () => {
                         onChange={(e) => setQuery(e.target.value)}
                         placeholder="E.g., Deep dive into recent advancements in solid-state batteries..."
                         disabled={status === "running"}
-                        className="w-full bg-white/5 border border-white/10 rounded-2xl pl-6 pr-32 py-5 text-white placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all disabled:opacity-50"
+                        className="w-full bg-card/5 border border-border rounded-2xl pl-6 pr-32 py-5 text-foreground placeholder-white/30 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/50 transition-all disabled:opacity-50"
                     />
                     <button
                         type="submit"
