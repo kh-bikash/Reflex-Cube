@@ -10,6 +10,19 @@ interface Candidate {
     reasoning: string;
 }
 
+/** Criteria set extracted from a job description by the talent cube's `train` action. */
+interface RoleCriterion {
+    name: string;
+    weight: number;
+    description?: string;
+}
+
+interface RoleModel {
+    role_title?: string;
+    summary?: string;
+    criteria?: RoleCriterion[];
+}
+
 export default function TalentCube() {
     // Mode: 'setup' | 'pipeline'
     const [view, setView] = useState<'setup' | 'pipeline'>('setup');
@@ -17,7 +30,7 @@ export default function TalentCube() {
     const [loading, setLoading] = useState(false);
 
     // "Trained" Model State
-    const [roleModel, setRoleModel] = useState<unknown>(null);
+    const [roleModel, setRoleModel] = useState<RoleModel | null>(null);
 
     // Candidates
     const [candidatesInput, setCandidatesInput] = useState('');

@@ -1,99 +1,80 @@
+import { Suspense } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
-// Import all cubes
-import { ChefCube } from "../components/cubes/ChefCube";
-import { AlphaCube } from "../components/cubes/AlphaCube";
-import { NexusCube } from "../components/cubes/NexusCube";
-import { LensCube } from "../components/cubes/LensCube";
-import CareerCube from "../components/cubes/CareerCube";
-import BrandCube from "../components/cubes/BrandCube";
-import LegalCube from "../components/cubes/LegalCube";
-import FitPalCube from "../components/cubes/FitPalCube";
-import TravelCube from "../components/cubes/TravelCube";
-import SentinelCube from "../components/cubes/SentinelCube";
-import LedgerCube from "../components/cubes/LedgerCube";
-import TalentCube from "../components/cubes/TalentCube";
-import { DreamCube } from "../components/cubes/DreamCube";
-import ForgeCube from "../components/cubes/ForgeCube";
-import LegacyCube from "../components/cubes/LegacyCube";
-import { VisionCube } from "../components/cubes/VisionCube";
-import { ResearchCube } from "../components/cubes/ResearchCube";
-import { SocialCube } from "../components/cubes/SocialCube";
+import { getCube } from "../lib/cubes";
+
+const ConsoleFallback = () => (
+    <div className="flex h-full min-h-[60vh] flex-col items-center justify-center gap-4 text-white/50">
+        <Loader2 className="h-8 w-8 animate-spin" />
+        <p className="font-mono text-xs uppercase tracking-widest">Booting cube…</p>
+    </div>
+);
 
 const CubePage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-
-    const renderCube = () => {
-        switch (id) {
-            case "chef": return <ChefCube />;
-            case "alpha": return <AlphaCube />;
-            case "nexus": return <NexusCube />;
-            case "lens": return <LensCube />;
-            case "career": return <CareerCube />;
-            case "brand": return <BrandCube />;
-            case "legal": return <LegalCube />;
-            case "travel": return <TravelCube />;
-            case "fitpal": return <FitPalCube />;
-            case "sentinel": return <SentinelCube />;
-            case "ledger": return <LedgerCube />;
-            case "talent": return <TalentCube />;
-            case "dream": return <DreamCube />;
-            case "forge": return <ForgeCube />;
-            case "vision": return <VisionCube />;
-            case "legacy": return <LegacyCube />;
-            case "research": return <ResearchCube />;
-            case "social": return <SocialCube />;
-            default:
-                return (
-                    <div className="flex flex-col items-center justify-center h-[60vh] text-foreground">
-                        <h2 className="text-3xl font-bold mb-4">Engine Offline</h2>
-                        <p className="text-muted-foreground mb-8">This cube is currently undergoing maintenance.</p>
-                        <button onClick={() => navigate(-1)} className="px-6 py-2 bg-primary text-primary-foreground rounded-full hover:opacity-90">
-                            Return to Hub
-                        </button>
-                    </div>
-                );
-        }
-    };
+    const cube = getCube(id);
 
     return (
-        <div className="min-h-screen bg-[#000] overflow-hidden text-foreground font-sans selection:bg-primary/30 relative flex flex-col pt-32 pb-24 px-6 z-10">
+        <div className="relative z-10 flex min-h-screen flex-col overflow-hidden bg-[#000] px-6 pb-24 pt-32 font-sans text-foreground selection:bg-primary/30">
             {/* Global Abstract Background for Cube Page */}
-            <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-                <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#2a1b54] rounded-full blur-[150px] opacity-20 animate-pulse"></div>
-                <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] bg-[#0f2e4a] rounded-full blur-[150px] opacity-20"></div>
+            <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+                <div className="absolute left-[-10%] top-[-20%] h-[50%] w-[50%] animate-pulse rounded-full bg-[#2a1b54] opacity-20 blur-[150px]"></div>
+                <div className="absolute bottom-[-20%] right-[-10%] h-[60%] w-[60%] rounded-full bg-[#0f2e4a] opacity-20 blur-[150px]"></div>
                 <div className="absolute inset-0 bg-[url('/noise.png')] opacity-5 mix-blend-overlay"></div>
             </div>
 
-            <div className="max-w-[1600px] w-full mx-auto flex-1 flex flex-col relative z-10">
+            <div className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-1 flex-col">
                 <div className="mb-8 flex items-center justify-between">
-                    <button 
+                    <button
                         onClick={() => navigate(-1)}
-                        className="inline-flex items-center gap-2 text-white/50 hover:text-white transition-colors bg-white/5 px-6 py-2.5 rounded-full border border-white/10 shadow-lg backdrop-blur-md hover:bg-white/10"
+                        className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-6 py-2.5 text-white/50 shadow-lg backdrop-blur-md transition-colors hover:bg-white/10 hover:text-white"
                     >
-                        <ArrowLeft className="w-4 h-4" />
+                        <ArrowLeft className="h-4 w-4" />
                         <span className="text-sm font-bold tracking-wide">Back to Hub</span>
                     </button>
-                    <div className="px-4 py-1.5 rounded-full text-xs font-bold font-mono tracking-wider bg-white/5 border border-white/10 text-emerald-400 backdrop-blur-md">
-                        SYSTEM ONLINE
-                    </div>
+                    {cube && (
+                        <div className="flex items-center gap-3">
+                            <span className="hidden text-sm font-semibold text-white/70 sm:inline">{cube.title}</span>
+                            <div className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 font-mono text-xs font-bold tracking-wider text-emerald-400 backdrop-blur-md">
+                                SYSTEM ONLINE
+                            </div>
+                        </div>
+                    )}
                 </div>
-                
-                {/* 
-                    This container gives the cube a defined height and border so it doesn't stretch infinitely 
-                    and looks like a proper web application embedded in the page.
+
+                {/*
+                    This container gives the cube a defined height and border so it doesn't stretch
+                    infinitely and looks like a proper web application embedded in the page.
                 */}
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="flex-1 w-full bg-[#0a0a0a]/80 backdrop-blur-2xl rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden min-h-[80vh] relative"
+                    className="relative min-h-[80vh] w-full flex-1 overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#0a0a0a]/80 shadow-2xl backdrop-blur-2xl"
                 >
                     {/* Inner Edge Glow */}
-                    <div className="absolute inset-0 rounded-[2.5rem] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)] pointer-events-none z-50"></div>
-                    {renderCube()}
+                    <div className="pointer-events-none absolute inset-0 z-50 rounded-[2.5rem] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.05)]"></div>
+
+                    {cube ? (
+                        <Suspense fallback={<ConsoleFallback />}>
+                            <cube.console />
+                        </Suspense>
+                    ) : (
+                        <div className="flex h-[60vh] flex-col items-center justify-center text-foreground">
+                            <h2 className="mb-4 text-3xl font-bold">Engine Offline</h2>
+                            <p className="mb-8 text-muted-foreground">
+                                {id ? `No cube is registered under "${id}".` : "No cube selected."}
+                            </p>
+                            <button
+                                onClick={() => navigate("/services")}
+                                className="rounded-full bg-primary px-6 py-2 text-primary-foreground hover:opacity-90"
+                            >
+                                Return to Hub
+                            </button>
+                        </div>
+                    )}
                 </motion.div>
             </div>
         </div>

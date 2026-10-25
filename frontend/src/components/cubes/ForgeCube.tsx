@@ -18,7 +18,7 @@ export default function ForgeCube() {
     const [generatedText, setGeneratedText] = useState("");
     const [prompt, setPrompt] = useState("The");
     const [saveName, setSaveName] = useState("");
-    const [models, setModels] = useState<Array<{ name: string; date?: string; size?: string }>>([]);
+    const [models, setModels] = useState<Array<{ name: string; date?: string; size: number }>>([]);
     const [chatHistory, setChatHistory] = useState<{ role: 'user' | 'ai', content: string }[]>([]);
     const [chatInput, setChatInput] = useState("");
 

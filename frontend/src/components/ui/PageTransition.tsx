@@ -15,7 +15,6 @@ const variants = {
 export const PageTransition = ({ children, className = "" }: PageTransitionProps) => {
     return (
         <motion.div
-            // @ts-expect-error type override
             initial="initial"
             animate="enter"
             exit="exit"

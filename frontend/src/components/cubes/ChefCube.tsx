@@ -4,22 +4,31 @@ import { Upload, X, ChefHat, Clock, Flame, List, Camera, Type } from 'lucide-rea
 import { api } from '../../lib/api';
 import { toast } from 'sonner';
 
+/** Shapes mirror the payload returned by `ChefCube.run()` in backend/app/cubes/chef.py. */
 interface Suggestion {
     name: string;
-    time: string;
+    cuisine?: string;
+    difficulty?: string;
+    time?: string;
 }
 
 interface Recipe {
-    name: string;
+    title: string;
+    description?: string;
+    calories?: string;
     time?: string;
-    difficulty?: string;
-    calories?: number;
     ingredients?: string[];
     steps?: string[];
+    tips?: string;
+    image_url?: string;
 }
 
 interface ChefResult {
-    safety?: string;
+    status?: 'success' | 'error';
+    message?: string;
+    detected?: string[];
+    analysis?: string;
+    safety?: string | null;
     suggestions?: Suggestion[];
     recipe?: Recipe;
 }

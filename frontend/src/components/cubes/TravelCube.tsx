@@ -87,7 +87,6 @@ export default function TravelCube() {
 
             {loading && (
                 <div className="flex flex-col items-center justify-center h-[50vh]">
-                    {/* @ts-expect-error: Motion component types compatibility */}
                     <motion.div
                         animate={{ y: [0, -20, 0] }}
                         transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
@@ -100,7 +99,6 @@ export default function TravelCube() {
             )}
 
             {result && !loading && (
-                // @ts-expect-error: Motion component types compatibility
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto">
                     {/* Destination Hero */}
                     <div className="relative rounded-3xl overflow-hidden bg-gradient-to-r from-sky-900 to-indigo-900 p-8 md:p-12 mb-8 border border-border">
@@ -123,7 +121,6 @@ export default function TravelCube() {
                     {/* Itinerary Grid */}
                     <div className="grid md:grid-cols-3 gap-6 mb-8">
                         {result.days.map((day, i) => (
-                            // @ts-expect-error: Motion component types compatibility
                             <motion.div
                                 key={day.day}
                                 initial={{ opacity: 0, y: 20 }}

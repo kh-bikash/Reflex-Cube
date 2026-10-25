@@ -60,7 +60,6 @@ export const SkillGraph = () => {
                         const y2 = (end.y / 100) * dimensions.h;
 
                         return (
-                            // @ts-expect-error framer-motion path
                             <motion.path
                                 key={i}
                                 initial={{ pathLength: 0, opacity: 0 }}
@@ -82,7 +81,6 @@ export const SkillGraph = () => {
                 </svg>
 
                 {skills.map((skill, i) => (
-                    // @ts-expect-error framer-motion div
                     <motion.div
                         key={skill.id}
                         onMouseEnter={() => playHover()}

@@ -1,73 +1,61 @@
-# Welcome to your Lovable project
+# Reflex Cube — Web Client
 
-## Project info
+React + TypeScript + Vite single-page app for the Reflex Cube platform. It hosts the
+prompt-to-model studio, the live training monitor and the Intelligence Cube consoles.
 
-**URL**: https://lovable.dev/projects/980d22b3-9943-4f38-add3-78f8e306f5cf
+See the [root README](../README.md) for the full-stack picture and
+[docs/architecture.md](../docs/architecture.md) for how the pieces fit together.
 
-## How can I edit this code?
+## Quick start
 
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/980d22b3-9943-4f38-add3-78f8e306f5cf) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```bash
+npm install
+cp .env.example .env     # optional; the defaults work for local development
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The dev server listens on <http://localhost:8080> and proxies `/api/*` to
+`http://localhost:8000`, so start the backend too (see
+[`backend/README.md`](../backend/README.md)).
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Scripts
 
-**Use GitHub Codespaces**
+| Script              | What it does                                                   |
+| ------------------- | -------------------------------------------------------------- |
+| `npm run dev`       | Vite dev server with HMR and the `/api` proxy.                 |
+| `npm run build`     | Typecheck (`tsc -b`) then emit a production bundle to `dist/`. |
+| `npm run preview`   | Serve the built `dist/` locally.                                |
+| `npm run typecheck` | Project-wide TypeScript check, no emit.                        |
+| `npm run lint`      | ESLint over the whole project.                                 |
+| `npm run lint:fix`  | ESLint with autofix.                                            |
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Layout
 
-## What technologies are used for this project?
+```text
+src/
+├── components/
+│   ├── cubes/      # One console per Intelligence Cube
+│   ├── canvas/     # react-three-fiber scenes
+│   ├── ui/         # shadcn/ui primitives (Radix based)
+│   └── visuals/    # Charts and gallery widgets
+├── pages/          # Route targets
+├── lib/
+│   ├── api.ts      # Typed fetch wrappers for the backend
+│   └── cubes.ts    # Cube catalog — ids, metadata, lazy-loaded consoles
+└── hooks/
+```
 
-This project is built with:
+### Adding a cube console
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+`src/lib/cubes.ts` is the single source of truth for the catalog. Add an entry whose
+`id` matches the id registered in `backend/app/cubes/registry.py`, point `console` at a
+lazy import of your component, and the `/cube/:id` route and hub listings pick it up
+automatically. Consoles are code-split, so each one only loads when visited.
 
-## How can I deploy this project?
+## Conventions
 
-Simply open [Lovable](https://lovable.dev/projects/980d22b3-9943-4f38-add3-78f8e306f5cf) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- Styling is Tailwind CSS with the design tokens defined in `src/index.css`; prefer the
+  semantic tokens (`bg-background`, `text-muted-foreground`) over raw colours.
+- `@/` resolves to `src/`.
+- Backend calls go through `src/lib/api.ts` rather than bare `fetch`, so the base URL and
+  error handling stay in one place.

@@ -28,7 +28,6 @@ export const AboutSection = () => {
     return (
         <section className="relative z-10 py-32 px-4 md:px-8 max-w-7xl mx-auto">
             <div className="mb-20">
-                {/* @ts-expect-error: Motion component types compatibility */}
                 <motion.h2
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -37,7 +36,6 @@ export const AboutSection = () => {
                 >
                     Redefining Intelligence.
                 </motion.h2>
-                {/* @ts-expect-error: Motion component types compatibility */}
                 <motion.p
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -52,7 +50,6 @@ export const AboutSection = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 auto-rows-[200px]">
                 {features.map((feature, i) => (
-                    // @ts-expect-error: Motion component types compatibility
                     <motion.div
                         key={i}
                         initial={{ opacity: 0, scale: 0.95 }}
