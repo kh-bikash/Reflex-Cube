@@ -15,13 +15,16 @@ from __future__ import annotations
 
 import contextlib
 import json
+import time
 import traceback
 from pathlib import Path
 from typing import Any
 
 from .config import (
     MAX_EVAL_SAMPLES,
+    MAX_MODEL_PARAMETERS,
     MAX_TRAIN_SAMPLES,
+    MAX_TRAIN_SECONDS,
     STORAGE_PATH,
     TRAIN_BATCH_SIZE,
     TRAIN_EPOCHS,
@@ -326,6 +329,46 @@ def run_training_job(job_data: dict[str, Any], job_id: str) -> None:
             (job_dir / "error.txt").write_text(tb, encoding="utf-8")
 
 
+class TrainingBudgetExceeded(RuntimeError):
+    """Raised when a run passes its wall-clock budget."""
+
+
+def _build_budget_callback(deadline: float | None):
+    """Stop training once `deadline` passes, so a job cannot run forever."""
+    from transformers import TrainerCallback
+
+    class BudgetCallback(TrainerCallback):
+        def on_step_end(self, args, state, control, **kwargs):
+            if deadline is not None and time.monotonic() > deadline:
+                # Asking the Trainer to stop lets it finish the step and save
+                # cleanly, rather than killing it mid-update.
+                control.should_training_stop = True
+                self.exceeded = True
+            return control
+
+        exceeded = False
+
+    return BudgetCallback()
+
+
+def check_model_fits(model) -> None:
+    """Refuse a model too large for this instance to fine-tune.
+
+    Raises:
+        RuntimeError: with a message naming the model's size and the limit.
+    """
+    if MAX_MODEL_PARAMETERS <= 0:
+        return
+    parameters = sum(p.numel() for p in model.parameters())
+    if parameters > MAX_MODEL_PARAMETERS:
+        raise RuntimeError(
+            f"This model has {parameters / 1e6:.0f}M parameters, above the "
+            f"{MAX_MODEL_PARAMETERS / 1e6:.0f}M this server can fine-tune. "
+            "Ask for a smaller architecture in the prompt (for example "
+            "'using distilbert'), or raise MAX_MODEL_PARAMETERS."
+        )
+
+
 def _publish(
     *, job_id, job_dir, job_name, prompt, task, base_model, dataset, metrics, log_event
 ) -> str | None:
@@ -484,6 +527,8 @@ def _train(*, job_id, job_dir, task, model_name, train_split, eval_split, log_ev
     if tokenizer.pad_token_id is not None:
         model.config.pad_token_id = tokenizer.pad_token_id
 
+    check_model_fits(model)
+
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model.to(device)
     logger.info(
@@ -509,6 +554,9 @@ def _train(*, job_id, job_dir, task, model_name, train_split, eval_split, log_ev
         fp16=device == "cuda",
     )
 
+    deadline = time.monotonic() + MAX_TRAIN_SECONDS if MAX_TRAIN_SECONDS > 0 else None
+    budget = _build_budget_callback(deadline)
+
     trainer = Trainer(
         model=model,
         args=args,
@@ -516,11 +564,26 @@ def _train(*, job_id, job_dir, task, model_name, train_split, eval_split, log_ev
         eval_dataset=tokenized_eval,
         data_collator=data_collator,
         compute_metrics=compute_metrics,
-        callbacks=[_build_callback(log_event, job_id)],
+        callbacks=[_build_callback(log_event, job_id), budget],
     )
 
     log_event({"stage": "training_started", "task": task, "model": model_name})
     train_result = trainer.train()
+
+    if budget.exceeded:
+        # The model is still usable — it just saw fewer steps than planned —
+        # so finish the run and say so rather than discarding the work.
+        logger.warning("Job %s hit its %ds budget and stopped early.", job_id, MAX_TRAIN_SECONDS)
+        log_event(
+            {
+                "stage": "budget_reached",
+                "msg": (
+                    f"Stopped after {MAX_TRAIN_SECONDS}s, the time budget for one run. "
+                    "The model was saved with the steps it completed."
+                ),
+            }
+        )
+        update_job(job_id, error_msg=f"Training stopped at the {MAX_TRAIN_SECONDS}s budget.")
 
     metrics: dict[str, float] = {
         "train_loss": float(train_result.training_loss)

@@ -11,7 +11,11 @@
   <img src="https://img.shields.io/badge/License-MIT-green" alt="MIT licence"/>
 </p>
 
-![Reflex Cube landing page](docs/screenshots/01-landing-hero.png)
+![Reflex Cube](docs/screenshots/01-landing.png)
+
+> **Run it online, free.** The whole stack deploys at no cost: the API on
+> Hugging Face Spaces, Postgres on Neon, trained models on the Hugging Face
+> Hub, the client on Vercel. See **[docs/hosting.md](docs/hosting.md)**.
 
 ---
 
@@ -33,10 +37,10 @@ console in the web app.
 
 | | |
 |:---:|:---:|
-| ![Prompt studio](docs/screenshots/02-prompt-studio.png) | ![Model dashboard](docs/screenshots/03-model-dashboard.png) |
-| *Prompt studio* | *Training dashboard* |
-| ![Cube hub](docs/screenshots/04-cube-hub.png) | ![Cube grid](docs/screenshots/05-cube-hub-grid.png) |
-| *The cube collection* | *…and the rest of it* |
+| ![The studio](docs/screenshots/03-studio.png) | ![The cube registry](docs/screenshots/04-cube-registry.png) |
+| *The studio — describe a model, watch it train* | *The cube registry* |
+| ![A cube console](docs/screenshots/05-cube-console.png) | ![Dark theme](docs/screenshots/06-dark-theme.png) |
+| *A cube console* | *Dark theme* |
 
 ---
 
@@ -210,7 +214,11 @@ one in [docs/api.md](docs/api.md). The essentials:
 
 | Method | Path | Purpose |
 | :--- | :--- | :--- |
-| `GET` | `/api/health` | Status, version, database, cube count |
+| `POST` | `/api/auth/register` | Create an account → `{access_token, user}` |
+| `POST` | `/api/auth/login` | Sign in → `{access_token, user}` |
+| `GET` | `/api/auth/me` | The signed-in account |
+| `PATCH` | `/api/auth/me` | Change the name, password or Hub token |
+| `GET` | `/api/health` | Status, version, database, cubes, capabilities |
 | `POST` | `/api/models/create` | Queue a prompt for training → `{job_id}` |
 | `GET` | `/api/training/status/{job_id}` | Progress, epoch, loss, accuracy |
 | `GET` | `/api/logs/{job_id}` | Live training log (server-sent events) |
@@ -225,18 +233,26 @@ one in [docs/api.md](docs/api.md). The essentials:
 More recipes, and a script that runs a downloaded checkpoint, are in
 [examples/](examples/).
 
+Everything that spends CPU needs an account:
+
 ```bash
+# Sign in
+TOKEN=$(curl -sS -X POST localhost:8000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"your-password"}' \
+  | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
 # Queue a model
 curl -X POST localhost:8000/api/models/create \
-  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"name":"review-sentiment","prompt":"classify movie reviews as positive or negative"}'
 
 # Watch it train
-curl -N localhost:8000/api/logs/<job_id>
+curl -N -H "Authorization: Bearer $TOKEN" localhost:8000/api/logs/<job_id>
 
 # Run a cube
 curl -X POST localhost:8000/api/cubes/run \
-  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d '{"cube_id":"alpha","input":{"text":"AAPL"}}'
 ```
 
@@ -283,13 +299,16 @@ you are most likely to touch:
 
 | Variable | Default | Purpose |
 | :--- | :--- | :--- |
-| `REFLEX_DATA_DIR` | `./storage` | Root for checkpoints, logs and caches |
-| `DATABASE_URL` | `sqlite:///backend/reflex.db` | Job database |
+| `JWT_SECRET` | generated | **Required in any deployment.** Signs sessions; must be ≥32 bytes |
+| `DATABASE_URL` | `sqlite:///backend/reflex.db` | Accounts and jobs. Use hosted Postgres anywhere real |
 | `CORS_ORIGINS` | `localhost:8080`, `localhost:5173` | Browser origins allowed to call the API |
+| `REFLEX_DATA_DIR` | `./storage` | Root for checkpoints, logs and caches |
+| `PUBLISH_MODELS_TO_HUB` | `0` | Push finished models to the Hub so they outlive the container |
+| `HF_TOKEN` | — | A *write* token: enables publishing, and gated models |
 | `MAX_TRAIN_SAMPLES` | `2000` | Training rows per job; `0` for no cap |
-| `HF_TOKEN` | — | Needed for gated models such as Gemma |
+| `MAX_MODEL_PARAMETERS` | `200000000` | Refuse a model too large for the instance, with a reason |
+| `REQUIRE_AUTH` | `1` | Turn off only for a single-user local install |
 | `E2B_API_KEY` | — | Enables the agent's code sandbox |
-| `BRAIN_EAGER_LOAD` | `0` | Load the agent model at startup rather than on first use |
 
 ---
 
@@ -302,16 +321,17 @@ make test       # pytest with coverage
 make env        # what's installed, what's configured, which cubes can load
 ```
 
-CI runs the backend suite on Linux, macOS and Windows, builds both Docker
-images, and gates on `npm audit`. See [CONTRIBUTING.md](CONTRIBUTING.md) for
-conventions, and [docs/architecture.md](docs/architecture.md) for how the
-pieces fit together.
+CI runs the backend suite (263 tests) on Linux, macOS and Windows, builds both
+Docker images, and gates on `npm audit`. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for conventions, and
+[docs/architecture.md](docs/architecture.md) for how the pieces fit together.
 
 ## Security
 
-The API ships **without authentication** — put it behind your own auth layer
-before exposing it. [SECURITY.md](SECURITY.md) covers that, what the agent
-sandbox does, and how to report a vulnerability.
+Accounts are required by default, and every job belongs to the user who created
+it. [SECURITY.md](SECURITY.md) covers what else the platform exposes — the
+agent's code sandbox, third-party model downloads — and how to report a
+vulnerability.
 
 ## Licence
 

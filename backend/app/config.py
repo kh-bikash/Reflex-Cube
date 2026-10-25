@@ -127,6 +127,17 @@ def _bool_from_env(name: str, default: bool = False) -> bool:
 #: unbounded fine-tune on CPU never finishes; 0 disables the cap.
 MAX_TRAIN_SAMPLES = _int_from_env("MAX_TRAIN_SAMPLES", 2000)
 
+#: Largest base model, in parameters, a job may fine-tune. A free container has
+#: no GPU and a few gigabytes of usable RAM: training needs roughly four times
+#: the model's size for optimizer state and gradients, so a 1B-parameter model
+#: is killed by the OOM reaper rather than finishing. Refusing up front gives
+#: the user a reason instead of a job that dies silently. 0 disables the check.
+MAX_MODEL_PARAMETERS = _int_from_env("MAX_MODEL_PARAMETERS", 200_000_000)
+
+#: Wall-clock budget for one job. A run that exceeds it is stopped and reported
+#: rather than occupying the instance indefinitely. 0 disables the limit.
+MAX_TRAIN_SECONDS = _int_from_env("MAX_TRAIN_SECONDS", 1800)
+
 #: Rows held out to report eval metrics; 0 skips evaluation.
 MAX_EVAL_SAMPLES = _int_from_env("MAX_EVAL_SAMPLES", 500)
 

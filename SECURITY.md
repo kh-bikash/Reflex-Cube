@@ -18,9 +18,22 @@ within a few days.
 
 Some of this is unusual, so it is worth stating plainly before you deploy it.
 
-- **The API has no authentication.** Every endpoint is open to anyone who can
-  reach the port. Run it behind your own auth layer, or on a private network.
-  Treat the defaults as a development configuration.
+- **Accounts guard everything that costs CPU.** Training and cube execution
+  require a signed-in user, and jobs are scoped to their owner. The catalog and
+  the health endpoint stay public. `REQUIRE_AUTH=0` disables this for a
+  single-user local install — never for anything reachable from the internet.
+- **`JWT_SECRET` must be set in a deployment.** The server refuses a secret
+  under 32 bytes, and when none is given it generates one per process, which
+  signs every user out on restart and breaks sessions across replicas.
+- **There is no rate limiting.** A signed-in user is limited to one concurrent
+  training job, and the instance to two, but nothing caps how fast accounts can
+  be created or requests made. Put a rate limiter in front of a public
+  deployment.
+- **A Hugging Face token stored by a user is a write credential.** It is kept
+  so their trained models can be pushed to their own account, is never returned
+  by the API, and is only read by the training worker for that user's own jobs.
+  It is stored as given, not encrypted at rest, so protect the database
+  accordingly.
 - **Training downloads and runs third-party artefacts.** Models and datasets
   come from the Hugging Face Hub. `HF_TRUST_REMOTE_CODE` is off by default
   because turning it on lets a dataset repository execute its own loading
@@ -34,6 +47,9 @@ Some of this is unusual, so it is worth stating plainly before you deploy it.
   Lens cubes are decoded and written under `CUBE_STORAGE_PATH`.
 - **Job ids are validated as UUIDs** before being joined onto a storage path,
   so a crafted id cannot escape the storage root.
+- **Login does not reveal which addresses have accounts.** An unknown address
+  and a wrong password return an identical response, and the unknown-address
+  path still performs a hash so it cannot be distinguished by timing.
 
 ## Credentials
 

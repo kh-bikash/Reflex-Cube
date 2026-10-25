@@ -135,3 +135,83 @@ class TestProgressLog:
         for line in raw.splitlines():
             if line.strip():
                 json.loads(line)  # raises on malformed output
+
+
+class TestResourceBudgets:
+    """A free instance must refuse work it cannot finish, with a reason."""
+
+    def test_oversized_model_is_refused_with_a_useful_message(self):
+        from app.trainer import check_model_fits
+
+        class Parameter:
+            def numel(self):
+                return 1_500_000_000
+
+        class HugeModel:
+            def parameters(self):
+                return [Parameter()]
+
+        with pytest.raises(RuntimeError) as caught:
+            check_model_fits(HugeModel())
+
+        message = str(caught.value)
+        assert "1500M parameters" in message
+        # The message has to say what to do about it, not just that it failed.
+        assert "distilbert" in message
+
+    def test_a_model_within_budget_passes(self):
+        from app.trainer import check_model_fits
+
+        class Parameter:
+            def numel(self):
+                return 66_000_000  # distilbert-base
+
+        class SmallModel:
+            def parameters(self):
+                return [Parameter()]
+
+        check_model_fits(SmallModel())  # does not raise
+
+    def test_the_check_can_be_disabled(self, monkeypatch):
+        import app.trainer as trainer
+
+        monkeypatch.setattr(trainer, "MAX_MODEL_PARAMETERS", 0)
+
+        class Parameter:
+            def numel(self):
+                return 10**12
+
+        class Enormous:
+            def parameters(self):
+                return [Parameter()]
+
+        trainer.check_model_fits(Enormous())  # does not raise
+
+    def test_sample_cap_shuffles_before_slicing(self, monkeypatch):
+        """Many corpora are ordered by label; head-slicing one yields a
+        single-class training set and a model that predicts one answer."""
+        import app.trainer as trainer
+
+        calls = []
+
+        class FakeSplit:
+            def __init__(self, size):
+                self._size = size
+
+            def __len__(self):
+                return self._size
+
+            def shuffle(self, seed):
+                calls.append(("shuffle", seed))
+                return self
+
+            def select(self, rows):
+                calls.append(("select", len(rows)))
+                return self
+
+        monkeypatch.setattr(trainer, "MAX_TRAIN_SAMPLES", 100)
+        monkeypatch.setattr(trainer, "MAX_EVAL_SAMPLES", 0)
+        trainer._split({"train": FakeSplit(10_000)})
+
+        assert calls[0][0] == "shuffle", "must shuffle before selecting"
+        assert ("select", 100) in calls

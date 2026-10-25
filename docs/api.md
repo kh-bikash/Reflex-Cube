@@ -3,10 +3,88 @@
 Base URL: `http://localhost:8000`. An interactive version generated from the
 code is at `/docs`, and the OpenAPI schema at `/openapi.json`.
 
-There is **no authentication**. Every endpoint is open to anyone who can reach
-the port — see [SECURITY.md](../SECURITY.md).
+## Authentication
+
+Reading the catalog and the health endpoint is open. Everything that spends CPU
+or touches private data needs an account:
+
+```bash
+TOKEN=$(curl -sS -X POST $BASE/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"you@example.com","password":"…"}' \
+  | python -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
+
+curl -H "Authorization: Bearer $TOKEN" $BASE/api/models/all
+```
+
+Tokens are JWTs, valid for seven days by default (`ACCESS_TOKEN_TTL_MINUTES`).
+A `401` means the token is missing, expired, or was signed by a server that has
+since restarted with a different secret — sign in again.
+
+Jobs belong to the account that created them. Another user's job reads as
+`404`, not `403`: whether a given id exists is not something one user should
+learn about another's work.
+
+A deployment can set `REQUIRE_AUTH=0` for a single-user local install, in which
+case the protected endpoints accept anonymous requests. `GET /api/health`
+reports which mode is in force.
 
 All request and response bodies are JSON unless stated otherwise.
+
+---
+
+## Accounts
+
+### `POST /api/auth/register`
+
+```json
+{ "email": "you@example.com", "password": "at-least-8-chars", "display_name": "Ada" }
+```
+
+→ `201`
+
+```json
+{
+  "access_token": "eyJ…",
+  "token_type": "bearer",
+  "expires_in": 604800,
+  "user": { "id": "…", "email": "you@example.com", "display_name": "Ada",
+            "has_hf_token": false }
+}
+```
+
+`409` if the address is taken, `422` for an invalid address or a password under
+`MIN_PASSWORD_LENGTH`, `403` if `ALLOW_REGISTRATION=0`.
+
+### `POST /api/auth/login`
+
+```json
+{ "email": "you@example.com", "password": "…" }
+```
+
+→ the same shape as register. `401` for a bad password — and identically for an
+unknown address, so the endpoint cannot be used to discover which addresses
+have accounts.
+
+### `GET /api/auth/me`
+
+The signed-in account. `401` without a valid token.
+
+### `PATCH /api/auth/me`
+
+```json
+{
+  "display_name": "Ada Lovelace",
+  "hf_token": "hf_…",
+  "current_password": "…",
+  "new_password": "…"
+}
+```
+
+Every field is optional. `hf_token` is a Hugging Face **write** token, used to
+publish your trained models to your own account; it is write-only and never
+returned. Send an empty string to remove it. Changing the password requires
+`current_password`, and `403` says it was wrong.
 
 ---
 
@@ -22,12 +100,19 @@ Liveness and dependency check. Used by the Docker healthcheck.
   "version": "2.0.0",
   "database": "ok",
   "cubes": 16,
-  "storage_path": "/data/models"
+  "storage_path": "/data/models",
+  "auth_required": true,
+  "registration_open": true,
+  "training_available": true,
+  "model_publishing": true
 }
 ```
 
 `status` is `degraded` when the database is unreachable; `database` then holds
-the error.
+the error. The four capability flags let a client explain itself before a user
+hits a wall: whether to show a sign-in screen, whether signups are open,
+whether the ML stack is installed (so training can work at all), and whether
+finished models are pushed to the Hub.
 
 ### `GET /`
 
@@ -78,9 +163,10 @@ one of `text-classification`, `sentiment-analysis`, `token-classification`,
 
 → `202 {"job_id": "…", "status": "queued"}`
 
-`422` for a blank name or prompt, or an unknown task. `500` if the training
-worker could not be started — the job is marked `failed` with the reason
-rather than left queued.
+`422` for a blank name or prompt, or an unknown task. `429` when you already
+have a job training, or the instance is at capacity — training is CPU-bound and
+a small box has two cores. `500` if the worker could not be started; the job is
+marked `failed` with the reason rather than left queued.
 
 ### `GET /api/training/status/{job_id}`
 
@@ -97,6 +183,7 @@ rather than left queued.
   "model_name": "distilbert-base-uncased",
   "dataset_name": "imdb",
   "result_path": null,
+  "hub_repo_id": "your-name/review-sentiment-3f1c4e2a",
   "error": null,
   "created_at": "2026-10-25T18:02:11Z",
   "updated_at": "2026-10-25T18:09:40Z"
@@ -145,8 +232,11 @@ stream.addEventListener("end", () => stream.close());
 ```
 
 **Stages:** `initializing`, `task_resolved`, `resolved`, `dataset_fallback`,
-`data_ready`, `training_started`, `training`, `evaluating`, `saving`,
-`completed`, `failed`.
+`data_ready`, `training_started`, `training`, `budget_reached`, `evaluating`,
+`saving`, `publishing`, `published`, `publish_failed`, `completed`, `failed`.
+
+`budget_reached` means the run hit `MAX_TRAIN_SECONDS` and stopped early; the
+model is still saved with the steps it completed.
 
 ### `GET /api/models/all`
 
@@ -280,8 +370,9 @@ Validation failures (`422`) list the offending fields:
 ## CORS
 
 `CORS_ORIGINS` (comma-separated) controls which browser origins may call the
-API; it defaults to the Vite dev server ports. `*` is accepted but then
-credentialed requests are disabled, because browsers reject that combination.
+API; it defaults to the Vite dev server ports. It must match your frontend's
+origin exactly, scheme included. `*` is accepted but then credentialed requests
+are disabled, because browsers reject that combination.
 
 In Docker the web container proxies `/api` to the backend, so requests are
 same-origin and CORS is not involved.

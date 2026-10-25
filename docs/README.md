@@ -2,6 +2,7 @@
 
 | Document | What's in it |
 | :--- | :--- |
+| [hosting.md](hosting.md) | Deploying the whole stack online for free: Hugging Face Spaces, Neon Postgres, the Hub, Vercel. |
 | [architecture.md](architecture.md) | How the system is put together and why: out-of-process training, the lazy cube registry, the SSE pipeline, the agent sandbox. |
 | [api.md](api.md) | Every endpoint, with request and response shapes, status codes and the SSE event vocabulary. |
 | [deployment.md](deployment.md) | Docker, Compose, PaaS, and a production checklist. |
