@@ -53,7 +53,7 @@ export default function TravelCube() {
     return (
         <div className="h-full w-full bg-card text-foreground p-8 overflow-y-auto font-sans relative">
             {/* Background Pattern */}
-            <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-10 pointer-events-none" />
+            <div className="absolute inset-0 bg-[url('/noise.png')] opacity-10 pointer-events-none" />
 
             <header className="relative z-10 max-w-5xl mx-auto flex flex-col md:flex-row justify-between items-center mb-12 border-b border-border pb-8">
                 <div className="flex items-center gap-4 mb-4 md:mb-0">

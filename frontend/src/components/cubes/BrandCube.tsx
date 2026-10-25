@@ -162,7 +162,7 @@ export default function BrandCube() {
 
                     {/* 5. Voice & Tone (Bottom Right) */}
                     <div className="col-span-12 md:col-span-4 bg-gradient-to-br from-purple-900/20 to-blue-900/20 rounded-3xl p-8 border border-border flex flex-col justify-center relative overflow-hidden">
-                        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+                        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-20" />
                         <Mic2 className="mb-4 text-purple-400" />
                         <h3 className="text-xl font-bold mb-2">Brand Voice</h3>
                         <p className="text-2xl text-foreground/80 font-light leading-relaxed">

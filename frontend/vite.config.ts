@@ -19,6 +19,15 @@ export default defineConfig(({ mode }) => ({
   preview: {
     host: "::",
     port: Number(process.env.PORT ?? 8080),
+    // `npm run preview` serves the production bundle, which calls its own
+    // origin; proxy /api so previewing a build needs no CORS setup either.
+    proxy: {
+      "/api": {
+        target: process.env.VITE_PROXY_TARGET ?? "http://localhost:8000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   plugins: [react()],
   resolve: {
