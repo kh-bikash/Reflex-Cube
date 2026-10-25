@@ -123,9 +123,15 @@ curl https://your-username-reflex-cube-api.hf.space/api/health
 ## 4. The frontend on Vercel
 
 1. [vercel.com/new](https://vercel.com/new) → import the repository.
-2. Set **Root Directory** to `frontend`. Vercel reads `frontend/vercel.json`
-   for the build command and the SPA rewrites.
-3. Add one environment variable:
+2. Set **Root Directory** to `frontend`. Vercel then reads
+   `frontend/vercel.json` for the framework preset and the SPA rewrites. (A
+   root-level `vercel.json` covers the case where you leave Root Directory at
+   the repository root, so the deploy works either way — but `frontend` is the
+   setting to prefer.)
+3. Under **Settings → General → Node.js Version**, use **22.x**. Vite 7
+   requires Node ^20.19 or >=22.12; the repository pins `engines.node` to
+   `22.x` so Vercel should pick this up on its own.
+4. Add one environment variable:
 
    | Name | Value |
    | :--- | :--- |
@@ -133,7 +139,7 @@ curl https://your-username-reflex-cube-api.hf.space/api/health
 
    No trailing slash. It is baked into the bundle at build time, so changing it
    needs a redeploy.
-4. Deploy, then go back and set the Space's `CORS_ORIGINS` to the URL Vercel
+5. Deploy, then go back and set the Space's `CORS_ORIGINS` to the URL Vercel
    gave you.
 
 ## 5. Check it end to end
@@ -172,6 +178,18 @@ intended: the model would be OOM-killed. Name a smaller one in the prompt
 **The first request of the day takes half a minute.** A free Space sleeps when
 idle and wakes on the next request. Paid hardware, or a scheduled ping, avoids
 it.
+
+**The Vercel build fails with `npm ci can only install packages when your
+package.json and package-lock.json are in sync`.** The lockfile is stale.
+Run `npm install --package-lock-only` in `frontend/` and commit the result.
+
+**The Vercel build fails on an unsupported Node version, or Vite refuses to
+start.** Set **Node.js Version** to 22.x in the project settings. Vite 7 needs
+^20.19 or >=22.12, and an older major fails at build time.
+
+**Vercel reports no `package.json`, or an empty output directory.** Root
+Directory is not set to `frontend` and the root `vercel.json` is not being
+picked up — set Root Directory to `frontend`.
 
 **A `no such column` error after upgrading.** New columns are added
 automatically on SQLite only. On Postgres, apply the change by hand or recreate
