@@ -1,18 +1,57 @@
-version: '3.8'
+# Full local stack: API on :8000, web client on :8080.
+#
+#   docker compose up --build
+#
+# The default backend image is API-only, so it builds in under a minute and the
+# cube catalog, job tracking and log streaming all work. Training and the cubes
+# that run models locally need the ML image:
+#
+#   docker compose build --build-arg INSTALL_ML=true backend
 
 services:
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      args:
+        # Set to "true" for the training pipeline and the ML-backed cubes.
+        INSTALL_ML: "${INSTALL_ML:-false}"
     ports:
       - "8000:8000"
     volumes:
+      # Checkpoints, job logs and the Hugging Face cache survive rebuilds.
       - reflex_data:/data
     environment:
-      - DATABASE_URL=sqlite:////data/reflex.db
-    restart: always
+      DATABASE_URL: sqlite:////data/reflex.db
+      REFLEX_DATA_DIR: /data
+      # The web container proxies /api, so requests are same-origin. These
+      # origins cover hitting the API directly from a dev server.
+      CORS_ORIGINS: http://localhost:8080,http://127.0.0.1:8080
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Optional credentials; unset features degrade rather than fail.
+      HF_TOKEN: ${HF_TOKEN:-}
+      E2B_API_KEY: ${E2B_API_KEY:-}
+      APIFY_API_TOKEN: ${APIFY_API_TOKEN:-}
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
 
-# Frontend would be built separately or served via Nginx in prod
-# For this dev setup, we focus on backend containerization as requested.
+  web:
+    build:
+      context: ./frontend
+      args:
+        # Empty: the bundle calls its own origin and nginx proxies /api.
+        VITE_API_URL: ""
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   reflex_data:
