@@ -1,0 +1,77 @@
+[project]
+name = "reflex-cube-backend"
+version = "2.0.0"
+description = "Prompt-to-model training API and Intelligence Cube registry for Reflex Cube."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app", "app.cubes", "app.routes", "app.utils", "scripts"]
+
+# ---------------------------------------------------------------------------
+# Tests
+# ---------------------------------------------------------------------------
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers --strict-config"
+filterwarnings = [
+    # Our own deprecations are errors; third-party noise is not.
+    "error::DeprecationWarning:app.*",
+    "ignore:Using `httpx` with `starlette.testclient`:DeprecationWarning",
+]
+markers = [
+    "ml: needs the heavy ML stack (torch/transformers); skipped when absent",
+    "network: reaches the public internet; skipped by default",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/cubes/*_core/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+# ---------------------------------------------------------------------------
+# Lint / format
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = [".venv", "venv", "app/cubes/forge_core", "app/cubes/vision_core"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # import sorting
+    "B",    # bugbear
+    "UP",   # pyupgrade
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "RUF",  # ruff-specific
+]
+ignore = [
+    "B008",  # FastAPI's Depends() in defaults is the documented idiom
+    "E501",  # long lines are caught by the formatter, not the linter
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Cubes catch broad exceptions on purpose: a cube failure must return an error
+# payload to the console rather than propagate as a 500.
+"app/cubes/*.py" = ["E722"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "scripts"]
